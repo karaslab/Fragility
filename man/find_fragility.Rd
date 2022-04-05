@@ -2,22 +2,24 @@
 % Please edit documentation in R/fragility_functions.R
 \name{find_fragility}
 \alias{find_fragility}
-\title{find_fragility
-Finds the fragility value for a single electrode (node) in a single time window}
+\title{find_fragility}
 \usage{
 find_fragility(node, A_k, N, limit)
 }
 \arguments{
-\item{node}{The node that you're calculating the fragility for}
+\item{node}{Integer specifying the node whose fragility is being calculated}
 
-\item{N}{The number of electrodes}
+\item{N}{Integer specifying number of electrodes}
 
-\item{A}{The adjacency matrix that you're calculating the fragility for}
+\item{A}{The adjacency matrix of the given time window}
 }
 \value{
 
 }
 \description{
-find_fragility
-Finds the fragility value for a single electrode (node) in a single time window
+Finds the fragility value for a single electrode (node) in a
+single time window
+}
+\examples{
+
 }
