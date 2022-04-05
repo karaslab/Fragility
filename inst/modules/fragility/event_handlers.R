@@ -16,6 +16,7 @@ observeEvent(
     pt_info_all <- process_fragility_patient(
       v = v,
       unit = input$recording_unit,
+      srate = srate,
       halve = FALSE
     )
     saveRDS(pt_info_all, file = paste0(subject_dir,'/',subject_code,'_pt_info'))

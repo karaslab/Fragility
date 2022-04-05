@@ -43,7 +43,12 @@ tnum <- trial$Trial[trial$Condition %in% requested_conditions]
 
 # where subject's pt_info, adj_info, and f_info RDS files are saved
 subject_dir <- module_tools$get_subject_dirs()$module_data_dir
+if (!file.exists(subject_dir)){
+  dir.create(subject_dir)
+}
 subject_code <- subject$subject_code
+
+srate <- module_tools$get_sample_rate(original = TRUE)
 
 # check if subject has pt_info, adj_info, and f_info files
 check <- check_subject(subject_code,subject_dir,trial$Trial)

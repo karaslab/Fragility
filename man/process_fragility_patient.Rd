@@ -4,7 +4,7 @@
 \alias{process_fragility_patient}
 \title{process_fragility_patient}
 \usage{
-process_fragility_patient(v, unit, halve = FALSE)
+process_fragility_patient(v, unit, srate, halve = FALSE)
 }
 \arguments{
 \item{v}{3D voltage array from RAVE's module_tools$get_voltage() and

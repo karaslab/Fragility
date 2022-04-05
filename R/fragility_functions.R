@@ -23,7 +23,7 @@
 #' voltage <- module_tools$get_voltage()
 #' v <- voltage$get_data()
 #' pt_info_all <- process_fragility_patient(v = v, unit = 'mV', halve = FALSE)
-process_fragility_patient <- function(v, unit, halve = FALSE) {
+process_fragility_patient <- function(v, unit, srate, halve = FALSE) {
   print('loading fragility patient')
   
   newunit <- 'uV'
@@ -39,7 +39,6 @@ process_fragility_patient <- function(v, unit, halve = FALSE) {
     }
   }
   
-  srate <- module_tools$get_sample_rate(original = TRUE)
   if (halve) {
     v <- v[,seq(1,ncol(v),2),] # halves the frequency
     srate <- srate/2
