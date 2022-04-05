@@ -31,7 +31,10 @@ define_initialization({
   # Enter code to handle data when a new subject is loaded
 })
 
-
+load_scripts(
+  'inst/modules/fragility/event_handlers.R', 
+  asis = TRUE
+)
 
 
 #  ---------------------------------  Inputs -----------------------------------
@@ -96,13 +99,22 @@ define_input(
     text = dipsaus::deparse_svec(loaded_electrodes)
 
     # Update
-    label = paste0('Electrode (', text, ')')
-    value = loaded_electrodes[1]
+    label = paste0('Select Electrode (Loaded: ', text, ')')
+    value = loaded_electrodes
   }
 )
 
 define_input(
-  selectInput(inputId = 'requested_conditions', multiple = TRUE, choices = character(0), label='Conditions to include'),
+  selectInput(inputId = 'recording_unit', label='Units of Recording', choices = c('mV','uV','nV'), selected = 'uV'),
+  
+  # init_args = 'value',
+  # 
+  # init_expr = {
+  # }
+)
+
+define_input(
+  selectInput(inputId = 'adj_conditions', choices = character(0), label='Seizure Condition for Adjacency Matrix'),
   
   init_args = c('choices', 'selected'),
   
@@ -112,48 +124,106 @@ define_input(
     # rstudioapi::navigateToFile(file.path(rave::rave_options('data_dir'), 'demo','DemoSubject','rave', 'meta','epoch_auditory_onset.csv'))
     
     choices = unique(module_tools$get_meta('trials')$Condition)
-    selected = choices
-  }
-)
-
-
-define_input(
-  sliderInput(inputId = 'requested_frequencies', label='Frequency Window', min = 0, max=1, value=0:1, step = 1, round=TRUE),
-  
-  init_args = c('min', 'max', 'value'),
-  
-  init_expr = {
-    # The frequency labels are defined in:
-    # rstudioapi::navigateToFile(file.path(rave::rave_options('data_dir'), 'demo','DemoSubject','rave', 'meta','frequencies.csv'))
-    
-    min = min(preload_info$frequencies)
-    max = max(preload_info$frequencies)
-    value = c(min,max)
+    selected = module_tools$get_meta('trials')$Condition[1]
   }
 )
 
 define_input(
-  sliderInput(inputId = 'requested_baseline', label='Baseline Window', min = 0, max=1, value=0:1),
+  selectInput(inputId = 'requested_conditions', choices = character(0), multiple = TRUE, label='Seizure Condition for Fragility Map'),
   
-  init_args = c('min', 'max', 'value'),
+  init_args = c('choices', 'selected'),
   
   init_expr = {
-    min = min(preload_info$time_points)
-    max = max(preload_info$time_points)
-    value = c(min,0)
+    # choices = module_tools$get_meta('trials')$Condition[check$f]
+    # selected = module_tools$get_meta('trials')$Condition[check$f][1]
+    choices = module_tools$get_meta('trials')$Condition
+    selected = module_tools$get_meta('trials')$Condition[1]
   }
+)
+
+define_input(
+  numericInput(inputId = 'requested_twindow', label='Time Window Size', min=100, max=1000, value=250, step=1),
+  
+  # init_args = c('timepoints', 'hz', 'value'),
+  # init_args = 'value',
+  # 
+  # init_expr = {
+  #   # timepoints = length(preload_info$time_points)
+  #   # hz = module_tools$get_sample_rate(original = TRUE)
+  # }
+)
+
+define_input(
+  sliderInput(inputId = 'requested_tstep', label='Time Step', min=1, max=1, value=1, step=1),
+  
+  init_args = c('max', 'value'),
+  
+  init_expr = {
+    max = input$requested_twindow
+    value = trunc(input$requested_twindow/2)
+  }
+)
+
+define_input(
+  numericInput(inputId = 'requested_nlambda', label='Number of Lambdas', min=1, max=100, value=16, step=1),
+  
+  # init_args = 'value',
+  # 
+  # init_expr = {
+  #   value = 
+  # }
+)
+
+define_input(
+  numericInput(inputId = 'requested_ncores', label='Number of cores', min=1, max=32, value=8, step=1),
+  
+  # init_args = 'max',
+  # 
+  # init_expr = {
+  #   max = how to find max cores in RAVE settings?
+  # }
+)
+
+define_input(
+  numericInput(inputId = 'future_maxsize', label='future.globals.maxSize (in megabytes)', min=500, max=8000, value=2000, step=500),
+)
+
+define_input(
+  selectInput(inputId = 'sort_fmap', choices = c('Electrode','Fragility'), selected = 'Electrode', label='Sort Fragility Map By:'),
+)
+
+define_input(
+  actionButton(inputId = 'load_pt', label='Load Patient'),
+)
+
+define_input(
+  actionButton(inputId = 'load_adj', label='Generate Adjacency Matrix'),
+)
+
+define_input(
+  actionButton(inputId = 'load_f', label='Generate Fragility Matrix'),
 )
 
 # the input_layout list is used by rave to determine order and grouping of layouts
 input_layout <- list(
-  'Select electrodes' = list('text_electrode'
+  '[-]Load Patient' = list(
+    'load_pt',
+    'recording_unit'
   ),
-  '[-]Analysis parameters' = list(
-    'requested_baseline',
-    'requested_frequencies'
+  '[-]Adjacency Matrix' = list(
+    'load_adj',
+    'adj_conditions',
+    'requested_twindow',
+    'requested_tstep',
+    'requested_nlambda',
+    'requested_ncores',
+    'future_maxsize'
   ),
-  '[-]Select conditions' = list(
-    'requested_conditions'
+  'Fragility Map' = list(
+    'load_f',
+    'requested_conditions',
+    'text_electrode',
+    'sort_fmap'
   )
 )
 
@@ -193,14 +263,14 @@ input_layout <- list(
 #'
 define_output(
   definition = verbatimTextOutput('text_result'),
-  title = 'This Output Shows all the Printed Results',
+  title = 'Message Board',
   width = 12,
   order = 1
 )
 
 define_output(
-  plotOutput('plot_result'),
-  title = 'My Plot result',
+  plotOutput('fragility_map'),
+  title = 'Fragility Map',
   width = 12,
   order = 2
 )

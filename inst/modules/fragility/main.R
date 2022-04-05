@@ -5,82 +5,114 @@ require(Fragility)
 # Initialize inputs
 dev_Fragility(expose_functions = TRUE)
 
-mount_demo_subject()
-
-init_module('fragility', debug = TRUE)
+# mount_demo_subject()
 
 rave::rave_prepare(
-  subject = 'KAA',
-  electrodes =  c(1:43,45:46,61:72,89:116,145:158,196:209),
-  epoch = 'KAA_sz',
+  subject = 'OnsetZone/PT01',
+  electrodes =  c(1:24,26:36,42:43,46:54,56:70,72:95),
+  epoch = 'PT01_sz',
   time_range = c(20,20),
   data_types = 'voltage',
   reference = 'car'
 )
 
+init_module('fragility', debug = TRUE)
+
+# rave::rave_prepare(
+#   subject = 'OnsetZone/KAA',
+#   electrodes =  c(1:43,45,46,61:72,89:116,145:158,196:209),
+#   epoch = 'KAA_sz',
+#   time_range = c(20,20),
+#   data_types = 'voltage',
+#   reference = 'car'
+# )
+
 # >>>>>>>>>>>> Start ------------- [DO NOT EDIT THIS LINE] ---------------------
 ######' @auto=TRUE
 
+# only use electrodes and trials requested
 requested_electrodes = dipsaus::parse_svec(text_electrode)
-
-time_points = preload_info$time_points
-frequencies = preload_info$frequencies
+# requested_electrodes <- c(1:24,26:36,42:43,46:54,56:70,72:95)
 
 trial = module_tools$get_meta('trials')
 
-# use only the electrode(s) and trial type(s) requested
+# trial for calculating adj matrix
+tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
 
+# trial(s) for display on fragility map
 tnum <- trial$Trial[trial$Condition %in% requested_conditions]
 
-# load the power
-p <- module_tools$get_power()
+# where subject's pt_info, adj_info, and f_info RDS files are saved
+subject_dir <- module_tools$get_subject_dirs()$module_data_dir
+subject_code <- subject$subject_code
 
-# subset based on UI choices
-p.sub <- p$subset(
-  Trial ~ trial$Condition %in% requested_conditions,
-  Electrode ~ Electrode %in% requested_electrodes,
-  Frequency ~ Frequency %within% requested_frequencies,
-  # just return an array, rather than a Tensor object
-  data_only = TRUE,
-  #don't drop length=1 margins
-  drop = FALSE
-)
+# check if subject has pt_info, adj_info, and f_info files
+check <- check_subject(subject_code,subject_dir,trial$Trial)
 
-# calculate baseline-corrected data across time(along_dim = 3), per frequency, per trial, per electrode; (unit_dims = 1,2,4)
-bsl <- dipsaus::baseline_array(
-  x=p.sub, along_dim = 3, unit_dims = c(1,2,4), method = 'percentage',
-  baseline_indexpoints = which(
-    time_points >= min(requested_baseline) & 
-      time_points  <= max(requested_baseline))
-)
+if (check$pt) {
+  pt_info_all <- readRDS(paste0(subject_dir,'/',subject_code,'_pt_info'))
+  pt_info <- list(
+    v = pt_info_all$v[tnum,,as.character(requested_electrodes)],
+    trial = tnum
+  )
+} else {
+  print("pt has not previously been loaded. click load patient button")
+}
 
-pt_info <- load_fragility_patient(
-  subject_code = 'KAA',
-  block = '4',
-  elec = requested_electrodes
-)
+if (check$adj[tnum_adj]) {
+  adj_info <- readRDS(paste0(subject_dir,'/',subject_code,'_adj_info_trial_',tnum_adj))
+} else {
+  print('adj matrix for this trial doesnt exist yet. click generate adjacency matrix button')
+}
 
-adj_info <- generate_adj_array(
-  t_window = 250, 
-  t_step = 125, 
-  v = pt_info$v, 
-  ncores = 8
-)
+S <- dim(pt_info_all$v)[2] # S is total number of timepoints
 
-f_info <- generate_fragility_matrix(
-  N = pt_info$N,
-  J = adj_info$J,
-  A = adj_info$A,
-  elec = requested_electrodes
-)
+if(S %% requested_tstep != 0) {
+  # truncate S to greatest number evenly divisible by timestep
+  S <- trunc(S/requested_tstep) * requested_tstep
+}
+J <- S/requested_tstep - (requested_twindow/requested_tstep) + 1
 
-f_plot_params <- list(
-  mat = f_info$norm,
-  x = 1:J,
-  y = 1:N,
-  zlim = c(0,1)
-)
+t_estimate <- 1.5*J
+t_estimate_hrs_min <- paste0(t_estimate%/%60, ' hrs, ', round(t_estimate%%60, digits = 1), ' min')
+message_board <- paste0('Estimated time: ', t_estimate_hrs_min)
 
+if (all(check$f[tnum])) {
+  if (length(tnum) > 1) {
+    f_norm_plot <- matrix(data = 0, nrow = dim(adj_info$A)[1], ncol = dim(adj_info$A)[3])
+    f_avg_plot <- vector(mode = 'numeric', length = dim(adj_info$A)[1])
+    for (i in tnum) {
+      f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum[i]))
+      f_norm_plot <- f_info$norm + f_norm_plot
+      f_avg_plot <- f_info$avg + f_avg_plot
+    }
+    f_norm_plot <- f_norm_plot/length(tnum)
+    f_avg_plot <- f_avg_plot/length(tnum)
+  } else {
+    f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum))
+    f_norm_plot <- f_info$norm
+    f_avg_plot <- f_info$avg
+  }
+  f_norm_plot <- f_norm_plot[as.character(requested_electrodes),]
+  f_avg_plot <- f_avg_plot[as.character(requested_electrodes)]
+  
+  if (sort_fmap == 'Electrode') {
+    elecsort <- sort(as.numeric(attr(f_norm_plot, "dimnames")[[1]]))
+    f_norm_plot <- f_norm_plot[as.character(elecsort),]
+  } else if (sort_fmap == 'Fragility') {
+    elecsort <- as.numeric(attr(sort(f_avg_plot), "names"))
+    f_norm_plot <- f_norm_plot[as.character(elecsort),]
+  }
+  
+  f_plot_params <- list(
+    mat = f_norm_plot,
+    x = 1:dim(f_norm_plot)[2],
+    y = 1:dim(f_norm_plot)[1],
+    zlim = c(0,1)
+  )
+} else {
+  print('fragility map for some trials has not been generated yet. click generate fragility matrix button')
+}
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------
 
@@ -98,7 +130,15 @@ result$get_value('preload_info')
 
 # Debug - online:
 Fragility::dev_Fragility(expose_functions = TRUE)
-mount_demo_subject()
+# mount_demo_subject()
+rave::rave_prepare(
+  subject = 'OnsetZone/PT01',
+  electrodes =  c(1:24,26:36,42:43,46:54,56:70,72:95),
+  epoch = 'PT01_sz',
+  time_range = c(20,20),
+  data_types = 'voltage',
+  reference = 'car'
+)
 view_layout('fragility')
 
 # Production - Deploy as RAVE module

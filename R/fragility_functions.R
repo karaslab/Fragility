@@ -9,31 +9,36 @@
 #' @export
 #'
 #' @examples
-load_fragility_patient <- function(subject_code, block, elec, halve = FALSE) {
-  v2 <- readRDS(paste0('/Volumes/bigbrain/oliver-r-projects/', subject_code, ' R Data/', subject_code, '_car_voltage'))
-  preload_info <- readRDS(paste0('/Volumes/bigbrain/oliver-r-projects/', subject_code, ' R Data/', subject_code, '_car_info'))
+load_fragility_patient <- function(v, unit, halve = FALSE) {
+  print('loading fragility patient')
   
-  elec <- as.character(elec)
-  trial_num <- match(block,cond)
-  # trial_num <- match(paste0('seizure (',block,')'), cond)
-  N <- length(elec) # number of electrodes
-  
-  v1 <- v2[,,elec] # assign only specified electrodes
+  if (unit != 'uV') {
+    if (unit == 'nV') {
+      v <- v/1000
+    } else if (unit == 'mV') {
+      v <- v*1000
+    }
+    # } else {
+    #   stop('Accepted units are uV, nV, or mV')
+    # }
+  }
   
   if (halve) {
-    v1 <- v1[,seq(1,ncol(v2),2),] # halves the frequency
+    v <- v[,seq(1,ncol(v),2),] # halves the frequency
   }
   
   pt_info <- list(
-    v = v1,
-    cond = preload_info$condition,
-    trial = trial_num,
-    N = N
+    v = v,
+    trial = as.numeric(attr(v, "dimnames")[[1]])
   )
 }
 
-generate_adj_array <- function(t_window, t_step, v, ncores) {
-  S <- ncol(v) # S is total number of timepoints
+generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) {
+  print('generating adj array')
+  
+  S <- dim(v)[2] # S is total number of timepoints
+  N <- dim(v)[3] # N is number of electrodes
+  
   if(S %% t_step != 0) {
     # truncate S to greatest number evenly divisible by timestep
     S <- trunc(S/t_step) * t_step
@@ -48,8 +53,8 @@ generate_adj_array <- function(t_window, t_step, v, ncores) {
     start_time <- Sys.time()
     print(paste0('current timewindow: ', k, ' out of ', J))
     t_start <- 1+(k-1)*t_step
-    svec <- generate_state_vectors(v1,trial_num,t_window,t_start)
-    A[,,k] <- find_adj_matrix(svec, N, t_window)
+    svec <- generate_state_vectors(v,trial_num,t_window,t_start)
+    A[,,k] <- find_adj_matrix(svec, N, t_window, nlambda = nlambda, ncores = ncores)
     
     # MSE
     estimate <- A[,,k] %*% svec$x
@@ -61,16 +66,19 @@ generate_adj_array <- function(t_window, t_step, v, ncores) {
   
   adj_info <- list(
     A = A,
-    mse = mse,
-    J = J
+    mse = mse
   )
 }
 
-generate_fragility_matrix <- function(N, J, A, elec, lim = 1i) {
+generate_fragility_matrix <- function(A, elec, lim = 1i) {
+  print('generating fragility matrix')
+  
+  N <- dim(A)[1]
+  J <- dim(A)[3]
   f_vals <- matrix(nrow = N, ncol = J)
   for (k in 1:J) {
     start_time <- Sys.time()
-    print(paste0('current index: ', k, ' out of ', J))
+    print(paste0('current timewindow: ', k, ' out of ', J))
     for (i in 1:N) {
       f_vals[i,k] <- find_fragility(i,A[,,k],N,lim)
     }
@@ -111,7 +119,7 @@ generate_state_vectors <- function(v,trial,t_window,t_start) {
 }
 
 # finds the adjacency matrix for given time window
-find_adj_matrix <- function(state_vectors, N, t_window) {
+find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   # vectorize x(t+1)
   # state_vectors <- svec # for testing purposes
   b <- c(state_vectors$x_n)
@@ -134,29 +142,44 @@ find_adj_matrix <- function(state_vectors, N, t_window) {
   # aka ridge filtering
   
   # find optimal lambda
-  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = TRUE)
-  l <- length(cv.ridge$lambda) + 1
+  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = TRUE, nlambda = nlambda)
+  lambdas <- rev(cv.ridge$lambda)
   
-  eigv <- 1:63
+  test_lambda <- function(l, H, b, lambdas, ncores) {
+    ridge <- glmnet::glmnet(H, b, alpha = 0, lambda = l)
+    N = sqrt(dim(H)[2])
+    adj_matrix <-  matrix(ridge$beta, nrow = N, ncol = N, byrow = TRUE)
+    eigv <- abs(eigen(adj_matrix, only.values = TRUE)$values)
+    stable <- max(eigv) < 1
+    list(
+      adj = adj_matrix,
+      abs_eigv = eigv,
+      stable = stable
+    )
+  }
   
-  # solve least squares for eigenvalues of adj_matrix less than 1
-  while (max(eigv) >= 1) {
+  l <- 1
+  stable_i <- vector(length = 0)
+  
+  while (length(stable_i) == 0) {
     
-    if (l == 1) {
-      stop('no lambdas make abs(eigenvalues) less than 1')
+    if ((l+ncores-1) <= length(lambdas)) {
+      results <- rave::lapply_async3(lambdas[l:(l+ncores-1)], test_lambda, H = H, b = b, .ncores = ncores)
+      stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+    } else {
+      results <- rave::lapply_async3(lambdas[l:length(lambdas)], test_lambda, H = H, b = b, .ncores = ncores)
+      stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+      break
     }
     
-    l <- l - 1
-    lambda <- cv.ridge$lambda[l]
-    
-    ridge <- glmnet::glmnet(H, b, alpha = 0, lambda = lambda)
-    X <- ridge$beta
-    
-    adj_matrix <- matrix(X, nrow = N, ncol = N, byrow = TRUE)
-    eigv <- abs(eigen(adj_matrix, only.values = TRUE)$values)
+    l <- l + ncores
   }
-  # X <- solve(t(H) %*% H) %*% t(H) %*% b
-  # adj_matrix <- matrix(X, nrow = N, ncol = N, byrow = TRUE)
+  
+  if (length(stable_i) == 0) {
+    stop('no lambdas make result in stable adjacency matrix')
+  }
+  
+  adj_matrix <- results[[stable_i[1]]]$adj
   
   return(adj_matrix)
 }

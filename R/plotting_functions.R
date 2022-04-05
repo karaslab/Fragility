@@ -12,6 +12,6 @@
 #' draw_heat_map(mat, x, y)
 draw_heat_map <- function(mat, x, y, zlim) {
   image(z = t(mat), x = x, y = y,
-        zlim = zlim,axes=F,ylab='frequency',xlab='time',
+        zlim = zlim, axes = F, ylab = '',xlab = '',
         col = colorRampPalette(c('blue', 'green', 'red'))(101))
 }

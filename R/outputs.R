@@ -2,7 +2,7 @@
 # will be used to render outputs
 
 text_result <- function(result, ...){
-  result$get_value('my_text_result')
+  result$get_value('message_board')
 }
 
 

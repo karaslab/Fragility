@@ -1,13 +1,108 @@
 require(glmnet)
 require(doMC)
 
-# functions ----
+load_fragility_patient <- function(subject_code, block, elec, unit, halve = FALSE) {
+  v2 <- readRDS(paste0('/Volumes/bigbrain/oliver-r-projects/', subject_code, ' R Data/', subject_code, '_car_voltage'))
+  preload_info <- readRDS(paste0('/Volumes/bigbrain/oliver-r-projects/', subject_code, ' R Data/', subject_code, '_car_info'))
+  
+  cond = preload_info$condition
+  
+  elec <- as.character(elec)
+  trial_num <- match(block,cond)
+  # trial_num <- match(paste0('seizure (',block,')'), cond)
+  # N <- length(elec) # number of electrodes
+  
+  v1 <- v2[,,elec] # assign only specified electrodes
+  
+  if (unit != 'uV') {
+    if (unit == 'nV') {
+      v1 <- v1/1000
+    } else if (unit == 'mV') {
+      v1 <- v1*1000
+    } else {
+      stop('Accepted units are uV, nV, or mV')
+    }
+  }
+  
+  
+  if (halve) {
+    v1 <- v1[,seq(1,ncol(v2),2),] # halves the frequency
+  }
+  
+  pt_info <- list(
+    v = v1,
+    trial = trial_num
+  )
+}
 
-# generate state vectors
-# x(t) represents the voltages of each electrode at time t in a N by T-1 matrix
-# where N is # of electrodes and T is timepoints in the specified time window
-# x(t+1) represents the same thing except shifted over by one timepoint
-# t_start specifies starting timepoint for this time window
+generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) {
+  S <- dim(v)[2] # S is total number of timepoints
+  N <- dim(v)[3] # N is number of electrodes
+  
+  if(S %% t_step != 0) {
+    # truncate S to greatest number evenly divisible by timestep
+    S <- trunc(S/t_step) * t_step
+  }
+  J <- S/t_step - (t_window/t_step) + 1 # J is number of time windows
+  A <- array(dim = c(N,N,J))
+  mse <- vector(mode = "numeric", length = J)
+  
+  doMC::registerDoMC(cores = ncores)
+  
+  for (k in 1:J) {
+    start_time <- Sys.time()
+    print(paste0('current timewindow: ', k, ' out of ', J))
+    t_start <- 1+(k-1)*t_step
+    svec <- generate_state_vectors(v,trial_num,t_window,t_start)
+    A[,,k] <- find_adj_matrix(svec, N, t_window, nlambda = nlambda, ncores = ncores)
+    
+    # MSE
+    estimate <- A[,,k] %*% svec$x
+    mse[k] <- mean((estimate - svec$x_n)^2)
+    
+    end_time <- Sys.time()
+    print(end_time - start_time)
+  }
+  
+  adj_info <- list(
+    A = A,
+    mse = mse
+  )
+}
+
+generate_fragility_matrix <- function(A, elec, lim = 1i) {
+  N <- dim(A)[1]
+  J <- dim(A)[3]
+  f_vals <- matrix(nrow = N, ncol = J)
+  for (k in 1:J) {
+    start_time <- Sys.time()
+    print(paste0('current timewindow: ', k, ' out of ', J))
+    for (i in 1:N) {
+      f_vals[i,k] <- find_fragility(i,A[,,k],N,lim)
+    }
+    end_time <- Sys.time()
+    print(end_time - start_time)
+  }
+  rownames(f_vals) <- elec
+  colnames(f_vals) <- 1:J
+  
+  f_norm <- f_vals
+  
+  # scale fragility values from 0 to 1 with 1 being most fragile
+  for (j in 1:J) {
+    max_f <- max(f_vals[,j])
+    f_norm[,j] <- sapply(f_vals[,j], function(x) (max_f - x) / max_f)
+  }
+  
+  avg_f <- rowMeans(f_norm)
+  
+  f_info <- list(
+    vals = f_vals,
+    norm = f_norm,
+    avg = avg_f
+  )
+}
+
 generate_state_vectors <- function(v,trial,t_window,t_start) {
   data <- v[trial,,]
   
@@ -21,10 +116,9 @@ generate_state_vectors <- function(v,trial,t_window,t_start) {
   return(state_vectors)
 }
 
-# finds the adjacency matrix for given time window
-find_adj_matrix <- function(state_vectors, N, t_window) {
+find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   # vectorize x(t+1)
-  #state_vectors <- svec # for testing purposes
+  # state_vectors <- svec # for testing purposes
   b <- c(state_vectors$x_n)
   
   # initialize big H matrix for system of linear equations
@@ -45,44 +139,47 @@ find_adj_matrix <- function(state_vectors, N, t_window) {
   # aka ridge filtering
   
   # find optimal lambda
-  cv.ridge <- cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = TRUE)
-  l <- length(cv.ridge$lambda) + 1
+  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = TRUE, nlambda = nlambda)
+  lambdas <- rev(cv.ridge$lambda)
   
-  eigv <- 1:63
+  test_lambda <- function(l, H, b, lambdas, ncores) {
+    ridge <- glmnet::glmnet(H, b, alpha = 0, lambda = l)
+    N = sqrt(dim(H)[2])
+    adj_matrix <-  matrix(ridge$beta, nrow = N, ncol = N, byrow = TRUE)
+    eigv <- abs(eigen(adj_matrix, only.values = TRUE)$values)
+    stable <- max(eigv) < 1
+    list(
+      adj = adj_matrix,
+      abs_eigv = eigv,
+      stable = stable
+    )
+  }
   
-  # solve least squares for eigenvalues of adj_matrix less than 1
-  while (max(eigv) >= 1) {
+  l <- 1
+  stable_i <- vector(length = 0)
+  
+  while (length(stable_i) == 0) {
     
-    if (l == 1) {
-      stop('no lambdas make abs(eigenvalues) less than 1')
+    if ((l+ncores-1) <= length(lambdas)) {
+      results <- rave::lapply_async3(lambdas[l:(l+ncores-1)], test_lambda, H = H, b = b, .ncores = ncores)
+      stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+    } else {
+      results <- rave::lapply_async3(lambdas[l:length(lambdas)], test_lambda, H = H, b = b, .ncores = ncores)
+      stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+      break
     }
     
-    l <- l - 1
-    lambda <- cv.ridge$lambda[l]
-    
-    ridge <- glmnet(H, b, alpha = 0, lambda = lambda)
-    X <- ridge$beta
-    
-    adj_matrix <- matrix(X, nrow = N, ncol = N, byrow = TRUE)
-    eigv <- abs(eigen(adj_matrix, only.values = TRUE)$values)
+    l <- l + ncores
   }
-  # X <- solve(t(H) %*% H) %*% t(H) %*% b
-  # adj_matrix <- matrix(X, nrow = N, ncol = N, byrow = TRUE)
+  
+  if (length(stable_i) == 0) {
+    stop('no lambdas make result in stable adjacency matrix')
+  }
+  
+  adj_matrix <- results[[stable_i[1]]]$adj
   
   return(adj_matrix)
 }
-
-#' find_fragility
-#' Finds the fragility value for a single electrode (node) in a single time window
-#'
-#' @param node The node that you're calculating the fragility for
-#' @param A The adjacency matrix that you're calculating the fragility for
-#' @param N The number of electrodes
-#'
-#' @return
-#' @export
-#'
-#' @examples
 
 find_fragility <- function(node, A_k, N, limit) {
   
@@ -102,158 +199,41 @@ find_fragility <- function(node, A_k, N, limit) {
   norm(perturb_mat, type = '2')
 }
 
-# lower output value means higher fragility
+requested_electrodes <- c(1:24,26:36,42:43,46:54,56:70,72:95)
 
-# load pt info ----
-# # YDR
-# v <- readRDS('/Volumes/bigbrain/oliver-r-projects/YDR R Data/YDR_car_voltage_all')
-# preload_info <- readRDS('/Volumes/bigbrain/oliver-r-projects/YDR R Data/YDR_car_info_all')
-# 
-# cond <- preload_info$condition
-# block <- 'V'
-# elec <- as.character(c(61:87,93:152))
+pt_info <- load_fragility_patient(
+  subject_code = 'PT01',
+  block = 'seizure (1)',
+  elec = requested_electrodes,
+  unit = 'nV'
+)
 
-# YDS grid
-# v2 <- readRDS('~/Documents/R/YDS_car_voltage_grid')
-# preload_info <- readRDS('~/Documents/R/YDS_car_info_grid')
-# 
-# cond <- preload_info$condition
-# block <- 'B'
-# elec <- as.character(132:194)
-# electrodes 174:180 result in a stable adjacency matrix
+adj_info <- generate_adj_array(
+  t_window = 250, 
+  t_step = 250, 
+  v = pt_info$v, 
+  trial_num = pt_info$trial,
+  nlambda = 16,
+  ncores = 8
+)
 
-# YDS seeg
-v2 <- readRDS('~/Documents/R/YDS_car_voltage_seeg')
-preload_info <- readRDS('~/Documents/R/YDS_car_info_seeg')
+f_info <- generate_fragility_matrix(
+  A = adj_info$A,
+  elec = requested_electrodes
+)
 
-cond <- preload_info$condition
-block <- 'B'
-elec <- as.character(c(1:19,21:35,42:131,196:207))
+f_plot_params <- list(
+  mat = f_info$norm,
+  x = 1:J,
+  y = 1:N,
+  zlim = c(0,1)
+)
 
-# PT01
-# v2 <- readRDS('~/Documents/R/PT01_car_voltage')
-# v2 <- v2/1000 # convert from nanovolts to microvolts
-# preload_info <- readRDS('~/Documents/R/PT01_car_info')
-# 
-# cond <- preload_info$condition
-# block <- '1'
-# elec <- as.character(c(1:24,26:36,42:43,46:54,56:70,72:95))
+ridge <- glmnet::glmnet(H, b, alpha = 0, lambda = 50)
+adj_matrix <-  matrix(ridge$beta, nrow = N, ncol = N, byrow = TRUE)
+max(abs(eigen(adj_matrix, only.values = TRUE)$values))
 
-# KAA
-# v2 <- readRDS('~/Documents/R/KAA_car_voltage')
-# v2 <- v2 * 1000 # convert from millivolts to microvolts
-# preload_info <- readRDS('~/Documents/R/KAA_car_info')
-
-# cond <- preload_info$condition
-# block <- '4'
-# elec <- as.character(c(1:43,45:80,82:116,129:164,166:244))
-# elec <- as.character(c(1:43,45,46,61:72,89:116,145:158,196:209))
-
-trial_num <- match(paste0('seizure (',block,')'), cond)
-N <- length(elec) # number of electrodes
-
-v1 <- v2[,,elec] # assign only specified electrodes
-v1 <- v1[,seq(1,ncol(v2),2),] # if 2000Hz, halve to 1000Hz
-
-# code ----
-# length of a single time window in whichever units one timepoint is
-t_window <- 250
-t_step <- 125
-
-# find adjacency matrices for entire timecourse, one for each time window
-S <- ncol(v1) # S is total number of timepoints
-if(S %% t_step != 0) {
-  # truncate S to greatest number evenly divisible by timestep
-  S <- trunc(S/t_step) * t_step
-}
-J <- S/t_step - (t_window/t_step) + 1 # J is number of time windows
-A <- array(dim = c(N,N,J))
-mse <- vector(mode = "numeric", length = J)
-
-ncores = 4
-registerDoMC(cores = ncores)
-
-for (k in 1:J) {
-  start_time <- Sys.time()
-  print(paste0('current timewindow: ', k, ' out of ', J))
-  t_start <- 1+(k-1)*t_step
-  svec <- generate_state_vectors(v1,trial_num,t_window,t_start)
-  A[,,k] <- find_adj_matrix(svec, N, t_window)
-  
-  # MSE
-  estimate <- A[,,k] %*% svec$x
-  mse[k] <- mean((estimate - svec$x_n)^2)
-  
-  end_time <- Sys.time()
-  print(end_time - start_time)
-}
-mean(mse)
-
-abs(eigen(A[,,1])$values)
-
-saveRDS(A, file = '/Volumes/bigbrain/oliver-r-projects/KAA_adj_laptop')
-A_s <- readRDS('/Volumes/bigbrain/oliver-r-projects/KAA R Data/KAA_adj_server')
-
-# reconstruct model using A to see if stable?
-v_trace <- t(v1[trial_num,,])
-v_recon <- v_trace
-for (k in 1:J){
-  t_start <- 1+(k-1)*t_step
-  v_recon[,t_start] <- v_trace[,t_start]
-  for (i in (t_start+1):(t_start+t_window-1)) {
-    v_recon[,i+1] <- A[,,k] %*% v_recon[,i]
-  }
-}
-for (i in 1:(S-1)) {
-  v_recon[,i+1] <- A[,,1] %*% v_recon[,i]
-}
-
-max(abs(eigen(A[,,1], only.values = TRUE)$values))
-
-timepoints <- 1:S
-plot(x = timepoints, y = v_trace[1,timepoints], type = 'l')
-plot(x = timepoints, y = v_recon[1,timepoints], type = 'l')
-
-# find fragility of A
-f_vals <- matrix(nrow = N, ncol = J)
-lim <- 1i
-for (k in 1:J) {
-  start_time <- Sys.time()
-  print(paste0('current index: ', k, ' out of ', J))
-  for (i in 1:N) {
-    f_vals[i,k] <- find_fragility(i,A[,,k],N,lim)
-  }
-  end_time <- Sys.time()
-  print(end_time - start_time)
-}
-rownames(f_vals) <- attr(v1, 'dimnames')$Electrode
-
-saveRDS(f_vals, file = '/Volumes/bigbrain/oliver-r-projects/KAA_f_vals')
-
-f_normalized <- f_vals
-
-# scale fragility values from 0 to 1 with 1 being most fragile
-for (j in 1:J) {
-  max_f <- max(f_vals[,j])
-  f_normalized[,j] <- sapply(f_vals[,j], function(x) (max_f - x) / max_f)
-}
-
-image(z = t(f_normalized), x=1:160,
+image(z = t(f_info$norm), x=1:160,
       y = 1:N, # as.numeric(elec),
-      zlim=c(0,1),
-      col = colorRampPalette(c('blue', 'green', 'red'))(101))
-
-avg_f <- rowMeans(f_normalized)
-
-# export avg_f
-# df <- data.frame(avg_f)
-# write.csv(df,'~/Documents/R/f_avg.csv')
-
-# test space----
-
-f_test <- f_normalized[as.character(c(34:35,63:70,89:92)),]
-f_flip <- f_test[nrow(f_test):1,]
-image(z = t(f_flip), x=1:160,
-      y = 1:14,
       zlim=c(0,1),
       col = colorRampPalette(c('blue', 'green', 'red'))(101))

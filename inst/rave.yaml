@@ -1,16 +1,16 @@
 package_name: Fragility
 finalize_installation: finalize_installation
 dev_subject:
-  project_name: demo
-  subject_code: DemoSubject
-  electrodes: '14,15'
-  epoch: auditory_onset
+  project_name: OnsetZone
+  subject_code: PT01
+  electrodes: '1:24,26:36,42:43,46:54,56:70,72:95'
+  epoch: PT01_sz
   time_range:
-    pre: 1.0
-    post: 2.0
-  reference: default
+    pre: 20
+    post: 20
+  reference: car
   frequency_range: ~
-  data_types: ~
+  data_types: voltage
   load_brain: yes
   download_url: https://github.com/beauchamplab/rave/releases/download/v0.1.9-beta/DemoSubjectData.zip
 modules:
