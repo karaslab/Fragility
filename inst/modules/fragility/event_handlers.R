@@ -13,7 +13,7 @@ observeEvent(
     print('load_pt button clicked')
     volt <- module_tools$get_voltage()
     v <- volt$get_data()
-    pt_info_all <- load_fragility_patient(
+    pt_info_all <- process_fragility_patient(
       v = v,
       unit = input$recording_unit,
       halve = FALSE
@@ -52,7 +52,7 @@ observeEvent(
     print('load_f button clicked')
     f_info <- generate_fragility_matrix(
       A = adj_info$A,
-      elec = requested_electrodes
+      elec = attr(pt_info_all$v, "dimnames")$Electrode
     )
     saveRDS(f_info, file = paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum))
   }

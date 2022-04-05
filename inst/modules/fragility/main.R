@@ -32,7 +32,6 @@ init_module('fragility', debug = TRUE)
 
 # only use electrodes and trials requested
 requested_electrodes = dipsaus::parse_svec(text_electrode)
-# requested_electrodes <- c(1:24,26:36,42:43,46:54,56:70,72:95)
 
 trial = module_tools$get_meta('trials')
 
