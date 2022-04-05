@@ -5,9 +5,12 @@ export(dev_Fragility)
 export(draw_heat_map)
 export(find_adj_matrix)
 export(find_fragility)
+<<<<<<< HEAD
 export(generate_adj_array)
 export(generate_fragility_matrix)
 export(generate_state_vectors)
+=======
+>>>>>>> 8b7ac519cec509841a80e419225f31f35824392f
 export(process_fragility_patient)
 import(dipsaus)
 import(rave)
