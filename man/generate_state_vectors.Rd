@@ -7,12 +7,19 @@
 generate_state_vectors(v, trial, t_window, t_start)
 }
 \arguments{
-\item{t_start}{}
+\item{v}{3D voltage matrix}
+
+\item{trial}{trial number}
+
+\item{t_window}{timewindow size}
+
+\item{t_start}{start time of current timewindow}
 }
 \value{
 
 }
 \description{
 Generates state vectors x(t) and x(t+1) for use in finding the adjacency
-matrix A in the equation x(t+1) = Ax(t).
+matrix A in the equation x(t+1) = Ax(t). For use within the
+generate_adj_array function.
 }

@@ -18,7 +18,7 @@ find_fragility(node, A_k, N, limit)
 }
 \description{
 Finds the fragility value for a single electrode (node) in a
-single time window
+single time window. For use within the generate_fragility_matrix function.
 }
 \examples{
 

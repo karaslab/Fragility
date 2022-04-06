@@ -44,6 +44,7 @@ observeEvent(
       nlambda = input$requested_nlambda,
       ncores = input$requested_ncores
     )
+    adj_info <- append(adj_info, list(trial = tnum_adj))
     saveRDS(adj_info, file = paste0(subject_dir,'/',subject_code,'_adj_info_trial_',tnum_adj))
   }
 )
@@ -55,7 +56,8 @@ observeEvent(
       A = adj_info$A,
       elec = attr(pt_info_all$v, "dimnames")$Electrode
     )
-    saveRDS(f_info, file = paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum))
+    f_info <- append(f_info, list(trial = tnum_adj))
+    saveRDS(f_info, file = paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum_adj))
   }
 )
 

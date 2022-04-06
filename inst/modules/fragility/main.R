@@ -79,44 +79,52 @@ J <- S/requested_tstep - (requested_twindow/requested_tstep) + 1
 
 t_estimate <- 1.5*J
 t_estimate_hrs_min <- paste0(t_estimate%/%60, ' hrs, ', round(t_estimate%%60, digits = 1), ' min')
-message_board <- paste0('Estimated time: ', t_estimate_hrs_min)
+estimate <- paste0('Estimated time: ', t_estimate_hrs_min)
 
 if (all(check$f[tnum])) {
   if (length(tnum) > 1) {
-    f_norm_plot <- matrix(data = 0, nrow = dim(adj_info$A)[1], ncol = dim(adj_info$A)[3])
-    f_avg_plot <- vector(mode = 'numeric', length = dim(adj_info$A)[1])
+    f_plot <- list(
+      norm = matrix(data = 0, nrow = dim(adj_info$A)[1], ncol = dim(adj_info$A)[3]),
+      avg = vector(mode = 'numeric', length = dim(adj_info$A)[1]),
+      trial = numeric()
+    )
     for (i in tnum) {
       f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum[i]))
-      f_norm_plot <- f_info$norm + f_norm_plot
-      f_avg_plot <- f_info$avg + f_avg_plot
+      f_plot[1:2] <- mapply(function(x,y) x + y, f_plot[1:2], f_info[2:3])
+      # f_plot$norm <- f_plot$norm + f_info$norm
+      # f_plot$avg <- f_plot$avg + f_info$avg
+      f_plot$trial <- c(f_plot$trial,tnum[i])
     }
-    f_norm_plot <- f_norm_plot/length(tnum)
-    f_avg_plot <- f_avg_plot/length(tnum)
+    f_plot[1:2] <- lapply(f_plot[1:2], function(x) x/length(tnum))
   } else {
     f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum))
-    f_norm_plot <- f_info$norm
-    f_avg_plot <- f_info$avg
+    f_plot[1:3] <- f_info[2:4]
   }
-  f_norm_plot <- f_norm_plot[as.character(requested_electrodes),]
-  f_avg_plot <- f_avg_plot[as.character(requested_electrodes)]
+  f_plot$norm <- f_plot$norm[as.character(requested_electrodes),]
+  f_plot$avg <- f_plot$avg[as.character(requested_electrodes)]
   
   if (sort_fmap == 'Electrode') {
-    elecsort <- sort(as.numeric(attr(f_norm_plot, "dimnames")[[1]]))
-    f_norm_plot <- f_norm_plot[as.character(elecsort),]
+    elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
+    f_plot$norm <- f_plot$norm[as.character(elecsort),]
   } else if (sort_fmap == 'Fragility') {
-    elecsort <- as.numeric(attr(sort(f_avg_plot), "names"))
-    f_norm_plot <- f_norm_plot[as.character(elecsort),]
+    elecsort <- as.numeric(attr(sort(f_plot$avg), "names"))
+    f_plot$norm <- f_plot$norm[as.character(elecsort),]
   }
   
   f_plot_params <- list(
-    mat = f_norm_plot,
-    x = 1:dim(f_norm_plot)[2],
-    y = 1:dim(f_norm_plot)[1],
+    mat = f_plot$norm,
+    x = 1:dim(f_plot$norm)[2],
+    y = 1:dim(f_plot$norm)[1],
     zlim = c(0,1)
   )
 } else {
   print('fragility map for some trials has not been generated yet. click generate fragility matrix button')
 }
+
+selected <- list(
+  adj = adj_info$trial,
+  f = f_plot$trial
+)
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------
 

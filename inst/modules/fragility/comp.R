@@ -207,20 +207,20 @@ define_input(
 # the input_layout list is used by rave to determine order and grouping of layouts
 input_layout <- list(
   '[-]Load Patient' = list(
-    'load_pt',
-    'recording_unit'
+    'recording_unit',
+    'load_pt'
   ),
   '[-]Adjacency Matrix' = list(
-    'load_adj',
     'adj_conditions',
     'requested_twindow',
     'requested_tstep',
     'requested_nlambda',
     'requested_ncores',
-    'future_maxsize'
+    'future_maxsize',
+    'load_adj',
+    'load_f'
   ),
   'Fragility Map' = list(
-    'load_f',
     'requested_conditions',
     'text_electrode',
     'sort_fmap'
@@ -262,17 +262,24 @@ input_layout <- list(
 #' @param order numeric order of outputs. Outputs will be re-ordered by this argument
 #'
 define_output(
-  definition = verbatimTextOutput('text_result'),
-  title = 'Message Board',
-  width = 12,
+  definition = verbatimTextOutput('estim_time'),
+  title = 'Estimated Time for Adjacency Matrix Calculation',
+  width = 6,
   order = 1
+)
+
+define_output(
+  definition = verbatimTextOutput('current_sel'),
+  title = 'Currently Loaded Trials',
+  width = 6,
+  order = 2
 )
 
 define_output(
   plotOutput('fragility_map'),
   title = 'Fragility Map',
   width = 12,
-  order = 2
+  order = 3
 )
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------
