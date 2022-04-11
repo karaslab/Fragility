@@ -29,6 +29,17 @@ mount_demo_subject()
 
 define_initialization({
   # Enter code to handle data when a new subject is loaded
+  subject_dir <- module_tools$get_subject_dirs()$module_data_dir
+  if (!file.exists(subject_dir)){
+    dir.create(subject_dir)
+  }
+  subject_code <- subject$subject_code
+  
+  trial = module_tools$get_meta('trials')
+  srate <- module_tools$get_sample_rate(original = TRUE)
+  
+  # check if subject has pt_info, adj_info, and f_info files
+  check <- check_subject(subject_code,subject_dir,trial$Trial)
 })
 
 load_scripts(
@@ -105,47 +116,49 @@ define_input(
 )
 
 define_input(
-  selectInput(inputId = 'recording_unit', label='Units of Recording', choices = c('mV','uV','nV'), selected = 'uV'),
-  
-  # init_args = 'value',
-  # 
-  # init_expr = {
-  # }
+  definition = selectInput(inputId = 'recording_unit', label='Units of Recording', choices = character(0)),
+
+  init_args = c('choices','selected'),
+
+  init_expr = {
+    choices = c('mV','uV','nV')
+    selected = 'uV'
+  }
 )
 
 define_input(
-  selectInput(inputId = 'adj_conditions', choices = character(0), label='Seizure Condition for Adjacency Matrix'),
-  
+  selectInput(inputId = 'adj_conditions', choices = character(0), label='Seizure Trial for Matrix Generation'),
+
   init_args = c('choices', 'selected'),
-  
+
   init_expr = {
     # the module_tools object allows access to the meta data, including the "trial label" variable called Condition
     # The trial numbers and condition labels, are in the epoch file
     # rstudioapi::navigateToFile(file.path(rave::rave_options('data_dir'), 'demo','DemoSubject','rave', 'meta','epoch_auditory_onset.csv'))
-    
+
     choices = unique(module_tools$get_meta('trials')$Condition)
     selected = module_tools$get_meta('trials')$Condition[1]
   }
 )
 
 define_input(
-  selectInput(inputId = 'requested_conditions', choices = character(0), multiple = TRUE, label='Seizure Condition for Fragility Map'),
-  
+  selectInput(inputId = 'requested_conditions', choices = character(0), multiple = TRUE, label='Seizure Trial(s) for Fragility Map Display'),
+
   init_args = c('choices', 'selected'),
-  
+
   init_expr = {
-    # choices = module_tools$get_meta('trials')$Condition[check$f]
-    # selected = module_tools$get_meta('trials')$Condition[check$f][1]
-    choices = module_tools$get_meta('trials')$Condition
-    selected = module_tools$get_meta('trials')$Condition[1]
+    choices = module_tools$get_meta('trials')$Condition[check$f]
+    selected = module_tools$get_meta('trials')$Condition[check$f][1]
+    # choices = module_tools$get_meta('trials')$Condition
+    # selected = module_tools$get_meta('trials')$Condition[1]
   }
 )
 
 define_input(
-  numericInput(inputId = 'requested_twindow', label='Time Window Size', min=100, max=1000, value=250, step=1),
-  
-  # init_args = c('timepoints', 'hz', 'value'),
-  # init_args = 'value',
+  sliderInput(inputId = 'requested_twindow', label='Time Window Size', min=100, max=1000, value=250, step=50, ticks = FALSE),
+
+  # could code in something to auto calculate timewindow using # of time points and sample rate?
+  # init_args = c('min', 'max', 'value', 'step'),
   # 
   # init_expr = {
   #   # timepoints = length(preload_info$time_points)
@@ -154,31 +167,31 @@ define_input(
 )
 
 define_input(
-  sliderInput(inputId = 'requested_tstep', label='Time Step', min=1, max=1, value=1, step=1),
-  
-  init_args = c('max', 'value'),
-  
+  selectInput(inputId = 'requested_tstep', label='Time Step', choices = character(0)),
+
+  init_args = c('choices', 'selected'),
+
   init_expr = {
-    max = input$requested_twindow
-    value = trunc(input$requested_twindow/2)
+    choices = c(input$requested_twindow, input$requested_twindow/2)
+    selected = input$requested_twindow/2
   }
 )
 
 define_input(
   numericInput(inputId = 'requested_nlambda', label='Number of Lambdas', min=1, max=100, value=16, step=1),
-  
+
   # init_args = 'value',
-  # 
+  #
   # init_expr = {
-  #   value = 
+  #   value =
   # }
 )
 
 define_input(
   numericInput(inputId = 'requested_ncores', label='Number of cores', min=1, max=32, value=8, step=1),
-  
+
   # init_args = 'max',
-  # 
+  #
   # init_expr = {
   #   max = how to find max cores in RAVE settings?
   # }
@@ -193,37 +206,42 @@ define_input(
 )
 
 define_input(
-  actionButton(inputId = 'load_pt', label='Load Patient'),
+  actionButton(inputId = 'process_pt', label='Pre-process Patient'),
 )
 
 define_input(
-  actionButton(inputId = 'load_adj', label='Generate Adjacency Matrix'),
+  actionButton(inputId = 'gen_adj', label='Generate Adjacency Matrix for this Trial'),
 )
 
 define_input(
-  actionButton(inputId = 'load_f', label='Generate Fragility Matrix'),
+  actionButton(inputId = 'gen_f', label='Generate Fragility Matrix for this Trial'),
+)
+
+define_input(
+  actionButton(inputId = 'refresh_btn', label='Refresh'),
 )
 
 # the input_layout list is used by rave to determine order and grouping of layouts
 input_layout <- list(
   '[-]Load Patient' = list(
     'recording_unit',
-    'load_pt'
+    'process_pt'
   ),
   '[-]Adjacency Matrix' = list(
-    'adj_conditions',
     'requested_twindow',
     'requested_tstep',
     'requested_nlambda',
     'requested_ncores',
     'future_maxsize',
-    'load_adj',
-    'load_f'
+    'adj_conditions',
+    'gen_adj',
+    'gen_f'
   ),
   'Fragility Map' = list(
     'requested_conditions',
     'text_electrode',
-    'sort_fmap'
+    'sort_fmap',
+    'refresh_btn'
   )
 )
 
@@ -280,6 +298,15 @@ define_output(
   title = 'Fragility Map',
   width = 12,
   order = 3
+)
+
+#for some reason this makes main execute an additional time
+define_output_3d_viewer(
+  outputId = 'power_3d',
+  message = 'Click here to reload viewer',
+  title = 'Results on surface',
+  height = '500px',
+  order = 4,
 )
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------

@@ -1,7 +1,7 @@
 require(glmnet)
 require(doMC)
 
-load_fragility_patient <- function(subject_code, block, elec, unit, halve = FALSE) {
+gen_fragility_patient <- function(subject_code, block, elec, unit, halve = FALSE) {
   v2 <- readRDS(paste0('/Volumes/bigbrain/oliver-r-projects/', subject_code, ' R Data/', subject_code, '_car_voltage'))
   preload_info <- readRDS(paste0('/Volumes/bigbrain/oliver-r-projects/', subject_code, ' R Data/', subject_code, '_car_info'))
   
@@ -201,7 +201,7 @@ find_fragility <- function(node, A_k, N, limit) {
 
 requested_electrodes <- c(1:24,26:36,42:43,46:54,56:70,72:95)
 
-pt_info <- load_fragility_patient(
+pt_info <- gen_fragility_patient(
   subject_code = 'PT01',
   block = 'seizure (1)',
   elec = requested_electrodes,

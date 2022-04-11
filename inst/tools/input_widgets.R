@@ -1,7 +1,7 @@
 define_input_3d_viewer_generator <- function(
   inputId, label = 'Open viewer in a new tab', button_types = c('primary', 'default'), 
   download_label = 'Download', download_btn = TRUE,
-  download_filename = 'rave_viewer.zip', 
+  downgen_filename = 'rave_viewer.zip', 
   reactive = 'input'
 ){
   input_ui = paste0(inputId, '_ui')
@@ -74,7 +74,7 @@ define_input_3d_viewer_generator <- function(
         output %?<-% getDefaultReactiveOutput()
         
         output[[!!input_download]] = shiny::downloadHandler(
-          filename = !!download_filename, content = function(con){
+          filename = !!downgen_filename, content = function(con){
             if( !length(...widget_env$widget) ){
               re = ...fun()
             }else{

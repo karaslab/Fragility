@@ -108,9 +108,11 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
   
   doMC::registerDoMC(cores = ncores)
   
+  adjprogress = rave::progress(title = 'Generating Adjacency Array', max = J)
   for (k in 1:J) {
     start_time <- Sys.time()
     print(paste0('current timewindow: ', k, ' out of ', J))
+    adjprogress$inc(paste0('Current timewindow: ', k, ' out of ', J))
     t_start <- 1+(k-1)*t_step
     svec <- generate_state_vectors(v,trial_num,t_window,t_start)
     A[,,k] <- find_adj_matrix(svec, N, t_window, nlambda = nlambda, ncores = ncores)
@@ -122,6 +124,8 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
     end_time <- Sys.time()
     print(end_time - start_time)
   }
+  
+  adjprogress$close()
   
   adj_info <- list(
     A = A,
@@ -152,20 +156,23 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
 #'     elec = c(1:24,26:36,42:43,46:54,56:70,72:95)
 #' )
 generate_fragility_matrix <- function(A, elec, lim = 1i) {
-  print('generating fragility matrix')
+  # print('generating fragility matrix')
   
   N <- dim(A)[1]
   J <- dim(A)[3]
   f_vals <- matrix(nrow = N, ncol = J)
+  fprogress = rave::progress(title = 'Generating Fragility Matrix', max = J)
   for (k in 1:J) {
-    start_time <- Sys.time()
-    print(paste0('current timewindow: ', k, ' out of ', J))
+    # start_time <- Sys.time()
+    # print(paste0('current timewindow: ', k, ' out of ', J))
+    fprogress$inc(paste0('Current timewindow: ', k, ' out of ', J))
     for (i in 1:N) {
       f_vals[i,k] <- find_fragility(i,A[,,k],N,lim)
     }
-    end_time <- Sys.time()
-    print(end_time - start_time)
+    # end_time <- Sys.time()
+    # print(end_time - start_time)
   }
+  fprogress$close()
   rownames(f_vals) <- elec
   colnames(f_vals) <- 1:J
   
