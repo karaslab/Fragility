@@ -172,40 +172,52 @@ observeEvent(input$cancel, {
 
 observeEvent(
   input$ok, {
-    print('ok button clicked')
-    print(input$requested_twindow)
-    print(input$requested_tstep)
-    print(str(pt_info_all$v))
-    print(tnum_adj)
-    print(input$requested_nlambda)
-    print(input$requested_ncores)
-    options(future.globals.maxSize = input$future_maxsize * 1024^2)
-    adj_info <- generate_adj_array(
-      t_window = input$requested_twindow,
-      t_step = as.numeric(input$requested_tstep),
-      v = pt_info_all$v,
-      trial_num = tnum_adj,
-      nlambda = input$requested_nlambda,
-      ncores = input$requested_ncores
-    )
-    adj_info <- append(adj_info, list(trial = tnum_adj))
-    saveRDS(adj_info, file = paste0(subject_dir,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    if (check$pt) {
+      print('ok button clicked')
+      print(input$requested_twindow)
+      print(input$requested_tstep)
+      print(str(pt_info_all$v))
+      print(tnum_adj)
+      print(input$requested_nlambda)
+      print(input$requested_ncores)
+      options(future.globals.maxSize = input$future_maxsize * 1024^2)
+      adj_info <- generate_adj_array(
+        t_window = input$requested_twindow,
+        t_step = as.numeric(input$requested_tstep),
+        v = pt_info_all$v,
+        trial_num = tnum_adj,
+        nlambda = input$requested_nlambda,
+        ncores = input$requested_ncores
+      )
+      adj_info <- append(adj_info, list(trial = tnum_adj))
+      saveRDS(adj_info, file = paste0(subject_dir,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    } else {
+      showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
+    }
   }
 )
 
 observeEvent(
   input$gen_f, {
-    print('gen_f button clicked')
-    f_info <- generate_fragility_matrix(
-      A = adj_info$A,
-      elec = attr(pt_info_all$v, "dimnames")$Electrode
-    )
-    f_info <- append(f_info, list(trial = tnum_adj))
-    saveRDS(f_info, file = paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum_adj))
-    check <- check_subject(subject$subject_code,module_tools$get_subject_dirs()$module_data_dir,trial$Trial)
-    updateSelectInput(session = session, inputId = 'requested_conditions',
-                      choices = module_tools$get_meta('trials')$Condition[check$f],
-                      selected = input$requested_conditions)
+    if (check$pt) {
+      if (check$adj[tnum_adj]) {
+        print('gen_f button clicked')
+        f_info <- generate_fragility_matrix(
+          A = adj_info$A,
+          elec = attr(pt_info_all$v, "dimnames")$Electrode
+        )
+        f_info <- append(f_info, list(trial = tnum_adj))
+        saveRDS(f_info, file = paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum_adj))
+        check <- check_subject(subject$subject_code,module_tools$get_subject_dirs()$module_data_dir,trial$Trial)
+        updateSelectInput(session = session, inputId = 'requested_conditions',
+                          choices = module_tools$get_meta('trials')$Condition[check$f],
+                          selected = input$requested_conditions)
+      } else {
+        showNotification('No valid adjacency arrays detected. Please choose a trial and click the "Generate Adjacency Matrix" button.', duration = 10)
+      }
+    } else {
+      showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
+    }
   }
 )
 

@@ -144,11 +144,16 @@ define_input(
 define_input(
   selectInput(inputId = 'requested_conditions', choices = character(0), multiple = TRUE, label='Seizure Trial(s) for Fragility Map Display'),
 
-  init_args = c('choices', 'selected'),
+  init_args = c('label','choices', 'selected'),
 
   init_expr = {
-    choices = module_tools$get_meta('trials')$Condition[check$f]
-    selected = module_tools$get_meta('trials')$Condition[check$f][1]
+    if (any(check$f)){
+      choices = module_tools$get_meta('trials')$Condition[check$f]
+      selected = module_tools$get_meta('trials')$Condition[check$f][1]
+    } else {
+      label = 'No valid fragility matrices detected! Please generate one above.'
+    }
+
     # choices = module_tools$get_meta('trials')$Condition
     # selected = module_tools$get_meta('trials')$Condition[1]
   }
@@ -279,25 +284,19 @@ input_layout <- list(
 #'
 #' @param order numeric order of outputs. Outputs will be re-ordered by this argument
 #'
-define_output(
-  definition = verbatimTextOutput('estim_time'),
-  title = 'Estimated Time for Adjacency Matrix Calculation',
-  width = 6,
-  order = 1
-)
 
 define_output(
   definition = verbatimTextOutput('current_sel'),
   title = 'Currently Loaded Trials',
   width = 6,
-  order = 2
+  order = 1
 )
 
 define_output(
   plotOutput('fragility_map'),
   title = 'Fragility Map',
   width = 12,
-  order = 3
+  order = 2
 )
 
 #for some reason this makes main execute an additional time
@@ -306,7 +305,7 @@ define_output_3d_viewer(
   message = 'Click here to reload viewer',
   title = 'Results on surface',
   height = '500px',
-  order = 4,
+  order = 3,
 )
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------

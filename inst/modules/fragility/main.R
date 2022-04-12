@@ -47,6 +47,11 @@ requested_electrodes = dipsaus::parse_svec(text_electrode)
 # trial for calculating adj and fragility matrix
 tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
 
+# temporary fix for RAVE initialization errors
+if (is.null(adj_conditions)) {
+  tnum_adj <- 1
+}
+
 # trial(s) for display on fragility map
 tnum <- trial$Trial[trial$Condition %in% requested_conditions]
 
@@ -98,60 +103,68 @@ if (check$pt) {
   
 } else {
   print("pt has not previously been loaded. click load patient button")
+  showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
 }
 
 if (check$adj[tnum_adj]) {
   adj_info <- readRDS(paste0(subject_dir,'/',subject_code,'_adj_info_trial_',tnum_adj))
 } else {
+  adj_info <- NULL
   print('adj matrix for this trial doesnt exist yet. click generate adjacency matrix button')
+  showNotification('No valid adjacency arrays detected. Please choose a trial and click the "Generate Adjacency Matrix" button.', duration = 10)
 }
 
 # fragility map stuff
 # do.call(req, split(check$f, seq_along(check$f)))
-if (length(tnum) > 1) {
-  f_plot <- list(
-    norm = matrix(data = 0, nrow = dim(adj_info$A)[1], ncol = dim(adj_info$A)[3]),
-    avg = vector(mode = 'numeric', length = dim(adj_info$A)[1]),
-    trial = numeric()
-  )
-  for (i in seq_along(tnum)) {
-    f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum[i]))
-    f_plot[1:2] <- mapply(function(x,y) x + y, f_plot[1:2], f_info[2:3])
-    # f_plot$norm <- f_plot$norm + f_info$norm
-    # f_plot$avg <- f_plot$avg + f_info$avg
-    f_plot$trial <- c(f_plot$trial,tnum[i])
+if (any(check$f)){
+  if (length(tnum) > 1) {
+    f_plot <- list(
+      norm = matrix(data = 0, nrow = dim(adj_info$A)[1], ncol = dim(adj_info$A)[3]),
+      avg = vector(mode = 'numeric', length = dim(adj_info$A)[1]),
+      trial = numeric()
+    )
+    for (i in seq_along(tnum)) {
+      f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum[i]))
+      f_plot[1:2] <- mapply(function(x,y) x + y, f_plot[1:2], f_info[2:3])
+      # f_plot$norm <- f_plot$norm + f_info$norm
+      # f_plot$avg <- f_plot$avg + f_info$avg
+      f_plot$trial <- c(f_plot$trial,tnum[i])
+    }
+    f_plot[1:2] <- lapply(f_plot[1:2], function(x) x/length(tnum))
+  } else {
+    f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum))
+    f_plot <- f_info[2:4]
   }
-  f_plot[1:2] <- lapply(f_plot[1:2], function(x) x/length(tnum))
+  
+  f_plot$norm <- f_plot$norm[as.character(requested_electrodes),]
+  f_plot$avg <- f_plot$avg[as.character(requested_electrodes)]
+  local_data$brain_f <- data.frame("Subject"=subject_code,
+                                   "Electrode"=requested_electrodes,"Time"=0,
+                                   "Avg_Fragility"=f_plot$avg)
+  
+  if (sort_fmap == 'Electrode') {
+    elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
+    f_plot$norm <- f_plot$norm[as.character(elecsort),]
+  } else if (sort_fmap == 'Fragility') {
+    elecsort <- as.numeric(attr(sort(f_plot$avg), "names"))
+    f_plot$norm <- f_plot$norm[as.character(elecsort),]
+  }
+  
+  f_plot_params <- list(
+    mat = f_plot$norm,
+    x = 1:dim(f_plot$norm)[2],
+    y = 1:dim(f_plot$norm)[1],
+    zlim = c(0,1)
+  )
 } else {
-  f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum))
-  f_plot <- f_info[2:4]
+  f_plot <- NULL
 }
-
-f_plot$norm <- f_plot$norm[as.character(requested_electrodes),]
-f_plot$avg <- f_plot$avg[as.character(requested_electrodes)]
-local_data$brain_f <- data.frame("Subject"=subject_code,
-                                 "Electrode"=requested_electrodes,"Time"=0,
-                                 "Avg_Fragility"=f_plot$avg)
-
-if (sort_fmap == 'Electrode') {
-  elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
-  f_plot$norm <- f_plot$norm[as.character(elecsort),]
-} else if (sort_fmap == 'Fragility') {
-  elecsort <- as.numeric(attr(sort(f_plot$avg), "names"))
-  f_plot$norm <- f_plot$norm[as.character(elecsort),]
-}
-
-f_plot_params <- list(
-  mat = f_plot$norm,
-  x = 1:dim(f_plot$norm)[2],
-  y = 1:dim(f_plot$norm)[1],
-  zlim = c(0,1)
-)
 
 selected <- list(
   adj = adj_info$trial,
   f = f_plot$trial
 )
+
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------
 
