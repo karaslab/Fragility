@@ -22,7 +22,7 @@
 #' @examples
 #' voltage <- module_tools$get_voltage()
 #' v <- voltage$get_data()
-#' pt_info_all <- process_fragility_patient(v = v, unit = 'mV', halve = FALSE)
+#' pt_info <- process_fragility_patient(v = v, unit = 'mV', halve = FALSE)
 process_fragility_patient <- function(v, unit, srate, halve = FALSE) {
   print('loading fragility patient')
   
@@ -87,7 +87,7 @@ process_fragility_patient <- function(v, unit, srate, halve = FALSE) {
 #' adj_info <- generate_adj_array(
 #'     t_window = 250,
 #'     t_step = 125,
-#'     v = pt_info_all$v,
+#'     v = pt_info$v,
 #'     trial_num = 1,
 #'     nlambda = 16,
 #'     ncores = 8
@@ -178,10 +178,16 @@ generate_fragility_matrix <- function(A, elec, lim = 1i) {
   
   f_norm <- f_vals
   
-  # scale fragility values from 0 to 1 with 1 being most fragile
+  # # scale fragility values from 0 to 1 with 1 being most fragile
+  # for (j in 1:J) {
+  #   max_f <- max(f_vals[,j])
+  #   f_norm[,j] <- sapply(f_vals[,j], function(x) (max_f - x) / max_f)
+  # }
+  
+  # scale fragility values from -1 to 1 with 1 being most fragile
   for (j in 1:J) {
     max_f <- max(f_vals[,j])
-    f_norm[,j] <- sapply(f_vals[,j], function(x) (max_f - x) / max_f)
+    f_norm[,j] <- sapply(f_vals[,j], function(x) 2*(max_f - x)/max_f - 1)
   }
   
   avg_f <- rowMeans(f_norm)
@@ -207,6 +213,7 @@ generate_fragility_matrix <- function(A, elec, lim = 1i) {
 #' @return
 #'
 #' @examples
+#' state_vectors <- generate_state_vectors(v,trial = 1,t_window = 250,t_start = 1)
 generate_state_vectors <- function(v,trial,t_window,t_start) {
   data <- v[trial,,]
   
@@ -236,6 +243,8 @@ generate_state_vectors <- function(v,trial,t_window,t_start) {
 #' @return
 #'
 #' @examples
+#' A is the 3D adjacency array in the following example, where k is the timewindow being calculated.
+#' A[,,k] <- find_adj_matrix(state_vectors, N = 85, t_window = 250, nlambda = 16, ncores = 16)
 find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   # vectorize x(t+1)
   # state_vectors <- svec # for testing purposes

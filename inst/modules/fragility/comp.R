@@ -29,9 +29,10 @@ mount_demo_subject()
 
 define_initialization({
   # Enter code to handle data when a new subject is loaded
-  subject_dir <- module_tools$get_subject_dirs()$module_data_dir
-  if (!file.exists(subject_dir)){
-    dir.create(subject_dir)
+  subject_dir <- module_tools$get_subject_dirs()
+  module_data <- subject_dir$module_data_dir
+  if (!file.exists(module_data)){
+    dir.create(module_data)
   }
   subject_code <- subject$subject_code
   
@@ -148,10 +149,13 @@ define_input(
 
   init_expr = {
     if (any(check$f)){
+      label = 'Seizure Trial(s) for Fragility Map Display'
       choices = module_tools$get_meta('trials')$Condition[check$f]
       selected = module_tools$get_meta('trials')$Condition[check$f][1]
     } else {
       label = 'No valid fragility matrices detected! Please generate one above.'
+      choices = character(0)
+      selected = NULL
     }
 
     # choices = module_tools$get_meta('trials')$Condition
@@ -203,11 +207,21 @@ define_input(
 )
 
 define_input(
-  numericInput(inputId = 'future_maxsize', label='future.globals.maxSize (in megabytes)', min=500, max=8000, value=2000, step=500),
+  numericInput(inputId = 'future_maxsize', label='future.globals.maxSize (in megabytes)', min=500, max=20000, value=2000, step=500),
 )
 
 define_input(
   selectInput(inputId = 'sort_fmap', choices = c('Electrode','Fragility'), selected = 'Electrode', label='Sort Fragility Map By:'),
+)
+
+define_input(
+  numericInput(inputId = 'f_list_length', label='List how many for most/least fragile?', min=1, max=1, value=1),
+  init_args = c('max','value'),
+
+  init_expr = {
+    max = floor(length(preload_info$electrodes)/2)
+    value = floor(length(preload_info$electrodes)/8)
+  }
 )
 
 define_input(
@@ -228,11 +242,11 @@ define_input(
 
 # the input_layout list is used by rave to determine order and grouping of layouts
 input_layout <- list(
-  '[-]Load Patient' = list(
+  '[-]Step 1: Load Patient' = list(
     'recording_unit',
     'process_pt'
   ),
-  '[-]Adjacency Matrix' = list(
+  '[-]Step 2: Adjacency Matrix' = list(
     'requested_twindow',
     'requested_tstep',
     'requested_nlambda',
@@ -242,10 +256,11 @@ input_layout <- list(
     'gen_adj',
     'gen_f'
   ),
-  'Fragility Map' = list(
+  'Step 3: Fragility Map' = list(
     'requested_conditions',
     'text_electrode',
     'sort_fmap',
+    'f_list_length',
     'refresh_btn'
   )
 )
@@ -288,15 +303,30 @@ input_layout <- list(
 define_output(
   definition = verbatimTextOutput('current_sel'),
   title = 'Currently Loaded Trials',
-  width = 6,
+  width = 12,
   order = 1
 )
+
+# define_output(
+#   definition = verbatimTextOutput('least_fragile'),
+#   title = 'Least Fragile Electrodes',
+#   width = 4,
+#   order = 3
+# )
 
 define_output(
   plotOutput('fragility_map'),
   title = 'Fragility Map',
-  width = 12,
+  width = 9,
   order = 2
+)
+
+define_output(
+  definition = tableOutput('fragility_table'),
+  title = 'Most/Least Fragile Electrodes',
+  width = 3,
+  #tags$style(type='text/css', '#most_fragile {white-space: pre-wrap;}'),
+  order = 3
 )
 
 #for some reason this makes main execute an additional time
@@ -305,7 +335,7 @@ define_output_3d_viewer(
   message = 'Click here to reload viewer',
   title = 'Results on surface',
   height = '500px',
-  order = 3,
+  order = 4
 )
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------

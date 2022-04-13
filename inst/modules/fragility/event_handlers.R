@@ -6,7 +6,8 @@ static_data = dipsaus::fastmap2()
 local_data = reactiveValues(
   brain_f = NULL,
   J = NULL,
-  estimate = NULL
+  estimate = NULL,
+  Hsize = NULL
 )
 
 power_3d_fun = function(need_calc, side_width, daemon_env, viewer_proxy, ...){
@@ -37,7 +38,7 @@ power_3d_fun = function(need_calc, side_width, daemon_env, viewer_proxy, ...){
   # }
   
   if( need_calc ){
-    values = local_data$brain_f
+    values = isolate(local_data$brain_f)
     
     # values = localdata.frame("Subject"=subject$subject_code,"Electrode"=requested_electrodes,"Time"=0,"Avg_Fragility"=local_data$avg_fragility)
     # values$Subject = as.factor(subject$subject_code)
@@ -127,13 +128,13 @@ observeEvent(
     print('process_pt button clicked')
     volt <- module_tools$get_voltage()
     v <- volt$get_data()
-    pt_info_all <- process_fragility_patient(
+    pt_info <- process_fragility_patient(
       v = v,
       unit = input$recording_unit,
       srate = srate,
       halve = FALSE
     )
-    saveRDS(pt_info_all, file = paste0(subject_dir,'/',subject_code,'_pt_info'))
+    saveRDS(pt_info, file = paste0(module_data,'/',subject_code,'_pt_info'))
     print(trial)
     print(tnum)
     print(requested_electrodes)
@@ -142,26 +143,28 @@ observeEvent(
 
 observeEvent(
   input$gen_adj, {
-    showModal(
-      modalDialog(
+    if (check$pt) {
+      showModal(modalDialog(
         title = 'Confirmation',
         easyClose = F,
         footer = tagList(
           actionButton(inputId = ns('cancel'), 'Cancel'),
           actionButton(inputId = ns('ok'), 'Do it!')
         ),
-        fluidRow(
-          column(
-            width = 12,
-            p('Generate adjacency array for: '),
-            tags$blockquote(paste0(local_data$J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
-            p('This might take a while.'),
-            hr(),
-            local_data$estimate
-          )
-        )
-      )
-    )
+        fluidRow(column(
+          width = 12,
+          p('Generate adjacency array for: '),
+          tags$blockquote(paste0(local_data$J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
+          p('Required futures.globals.maxSize: '),
+          tags$blockquote(format(local_data$Hsize, units = 'MB')),
+          p('This might take a while.'),
+          hr(),
+          local_data$estimate
+        ))
+      ))
+    } else {
+      showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
+    }
   }
 )
 
@@ -172,28 +175,16 @@ observeEvent(input$cancel, {
 
 observeEvent(
   input$ok, {
-    if (check$pt) {
-      print('ok button clicked')
-      print(input$requested_twindow)
-      print(input$requested_tstep)
-      print(str(pt_info_all$v))
-      print(tnum_adj)
-      print(input$requested_nlambda)
-      print(input$requested_ncores)
-      options(future.globals.maxSize = input$future_maxsize * 1024^2)
-      adj_info <- generate_adj_array(
-        t_window = input$requested_twindow,
-        t_step = as.numeric(input$requested_tstep),
-        v = pt_info_all$v,
-        trial_num = tnum_adj,
-        nlambda = input$requested_nlambda,
-        ncores = input$requested_ncores
-      )
-      adj_info <- append(adj_info, list(trial = tnum_adj))
-      saveRDS(adj_info, file = paste0(subject_dir,'/',subject_code,'_adj_info_trial_',tnum_adj))
-    } else {
-      showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
-    }
+    adj_info <- generate_adj_array(
+      t_window = input$requested_twindow,
+      t_step = as.numeric(input$requested_tstep),
+      v = pt_info$v,
+      trial_num = tnum_adj,
+      nlambda = input$requested_nlambda,
+      ncores = input$requested_ncores
+    )
+    adj_info <- append(adj_info, list(trial = tnum_adj))
+    saveRDS(adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
   }
 )
 
@@ -204,11 +195,11 @@ observeEvent(
         print('gen_f button clicked')
         f_info <- generate_fragility_matrix(
           A = adj_info$A,
-          elec = attr(pt_info_all$v, "dimnames")$Electrode
+          elec = attr(pt_info$v, "dimnames")$Electrode
         )
         f_info <- append(f_info, list(trial = tnum_adj))
-        saveRDS(f_info, file = paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum_adj))
-        check <- check_subject(subject$subject_code,module_tools$get_subject_dirs()$module_data_dir,trial$Trial)
+        saveRDS(f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
+        check <- check_subject(subject_code,module_data,trial$Trial)
         updateSelectInput(session = session, inputId = 'requested_conditions',
                           choices = module_tools$get_meta('trials')$Condition[check$f],
                           selected = input$requested_conditions)
@@ -223,7 +214,6 @@ observeEvent(
 
 observeEvent(
   input$adj_conditions, {
-    print('update')
     updateActionButton(session = session, inputId = 'gen_adj', 
                        label = paste0('Generate Adjacency Array for ', input$adj_conditions))
     updateActionButton(session = session, inputId = 'gen_f', 
@@ -232,8 +222,16 @@ observeEvent(
 )
 
 observeEvent(
+  input$requested_conditions, {
+    updateNumericInput(session = session, inputId = 'f_list_length', 
+                       max = floor(length(preload_info$electrodes)/2), 
+                       value = floor(length(preload_info$electrodes)/8))
+  }
+)
+
+observeEvent(
   input$refresh_btn, {
-    check <- check_subject(subject$subject_code,module_tools$get_subject_dirs()$module_data_dir,trial$Trial)
+    check <- check_subject(subject_code,module_data,trial$Trial)
     updateSelectInput(session = session, inputId = 'requested_conditions',
                       choices = module_tools$get_meta('trials')$Condition[check$f],
                       selected = input$requested_conditions)

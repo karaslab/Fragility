@@ -23,3 +23,6 @@ Generates state vectors x(t) and x(t+1) for use in finding the adjacency
 matrix A in the equation x(t+1) = Ax(t). For use within the
 generate_adj_array function.
 }
+\examples{
+state_vectors <- generate_state_vectors(v,trial = 1,t_window = 250,t_start = 1)
+}

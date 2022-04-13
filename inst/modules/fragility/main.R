@@ -31,16 +31,7 @@ init_module('fragility', debug = TRUE)
 ######' @auto=TRUE
 
 print('executing main')
-# print(text_electrode)
-# print(recording_unit)
-# print(adj_conditions)
-# print(requested_conditions)
-# print(requested_twindow)
-# print(requested_tstep)
-# print(requested_nlambda)
-# print(requested_ncores)
-# print(future_maxsize)
-# print(sort_fmap)
+
 # only use electrodes and trials requested
 requested_electrodes = dipsaus::parse_svec(text_electrode)
 
@@ -52,39 +43,33 @@ if (is.null(adj_conditions)) {
   tnum_adj <- 1
 }
 
+if(is.null(requested_tstep)) {
+  requested_tstep <- ""
+}
+
 # trial(s) for display on fragility map
 tnum <- trial$Trial[trial$Condition %in% requested_conditions]
 
-# where subject's pt_info, adj_info, and f_info RDS files are saved
-# subject_dir <- module_tools$get_subject_dirs()$module_data_dir
-# if (!file.exists(subject_dir)){
-#   dir.create(subject_dir)
+# # where subject's pt_info, adj_info, and f_info RDS files are saved
+# subject_dir <- module_tools$get_subject_dirs()
+# module_data <- subject_dir$module_data_dir
+# if (!file.exists(subject_dir$module_data_dir)){
+#   dir.create(subject_dir$module_data_dir)
 # }
 # subject_code <- subject$subject_code
 # 
 # srate <- module_tools$get_sample_rate(original = TRUE)
 
 # check if subject has pt_info, adj_info, and f_info files
-# check <- check_subject(subject_code,subject_dir,trial$Trial)
-# print(input$requested_conditions %in% module_tools$get_meta('trials')$Condition[check$f])
-# updateSelectInput(session = session, inputId = 'requested_conditions',
-#                   choices = module_tools$get_meta('trials')$Condition[check$f],
-#                   )
-# print(str(input$requested_conditions))
-# print(str(module_tools$get_meta('trials')$Condition[check$f]))
-#                   # selected = input$requested_conditions)
-
+check <- check_subject(subject_code,subject_dir,trial$Trial)
 
 if (check$pt) {
-  pt_info_all <- readRDS(paste0(subject_dir,'/',subject_code,'_pt_info'))
-  # pt_info <- list(
-  #   v = pt_info_all$v[tnum,,as.character(requested_electrodes)],
-  #   trial = tnum
-  # )
+  pt_info <- readRDS(paste0(module_data,'/',subject_code,'_pt_info'))
   
   # Show estimated adj array calculation time
   if (requested_tstep != "") {
-    S <- dim(pt_info_all$v)[2] # S is total number of timepoints
+    S <- dim(pt_info$v)[2] # S is total number of timepoints
+    N <- dim(pt_info$v)[3]
     
     tstep <- as.numeric(requested_tstep)
     
@@ -99,19 +84,20 @@ if (check$pt) {
     t_estimate <- 1.5*J
     t_estimate_hrs_min <- paste0(t_estimate%/%60, ' hours, ', round(t_estimate%%60, digits = 1), ' minutes')
     local_data$estimate <- paste0('Estimated time: ', t_estimate_hrs_min)
+    local_data$Hsize <- object.size(matrix(0, nrow = N*(requested_twindow-1), ncol = N^2)) + (200 * 1024^2)
   }
   
+  if (check$adj[tnum_adj]) {
+    adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+  } else {
+    adj_info <- list(trial = "None")
+    print('adj matrix for this trial doesnt exist yet. click generate adjacency matrix button')
+    showNotification('No valid adjacency arrays detected. Please choose a trial and click the "Generate Adjacency Matrix" button.', duration = 10)
+  }
 } else {
+  adj_info <- list(trial = "None")
   print("pt has not previously been loaded. click load patient button")
   showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
-}
-
-if (check$adj[tnum_adj]) {
-  adj_info <- readRDS(paste0(subject_dir,'/',subject_code,'_adj_info_trial_',tnum_adj))
-} else {
-  adj_info <- NULL
-  print('adj matrix for this trial doesnt exist yet. click generate adjacency matrix button')
-  showNotification('No valid adjacency arrays detected. Please choose a trial and click the "Generate Adjacency Matrix" button.', duration = 10)
 }
 
 # fragility map stuff
@@ -124,7 +110,7 @@ if (any(check$f)){
       trial = numeric()
     )
     for (i in seq_along(tnum)) {
-      f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum[i]))
+      f_info <- readRDS(paste0(module_data,'/',subject_code,'_f_info_trial_',tnum[i]))
       f_plot[1:2] <- mapply(function(x,y) x + y, f_plot[1:2], f_info[2:3])
       # f_plot$norm <- f_plot$norm + f_info$norm
       # f_plot$avg <- f_plot$avg + f_info$avg
@@ -132,7 +118,7 @@ if (any(check$f)){
     }
     f_plot[1:2] <- lapply(f_plot[1:2], function(x) x/length(tnum))
   } else {
-    f_info <- readRDS(paste0(subject_dir,'/',subject_code,'_f_info_trial_',tnum))
+    f_info <- readRDS(paste0(module_data,'/',subject_code,'_f_info_trial_',tnum))
     f_plot <- f_info[2:4]
   }
   
@@ -142,22 +128,45 @@ if (any(check$f)){
                                    "Electrode"=requested_electrodes,"Time"=0,
                                    "Avg_Fragility"=f_plot$avg)
   
+  elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
+  fsort <- as.numeric(attr(sort(f_plot$avg), "names"))
+  
   if (sort_fmap == 'Electrode') {
-    elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
-    f_plot$norm <- f_plot$norm[as.character(elecsort),]
+    elec_order <- elecsort
   } else if (sort_fmap == 'Fragility') {
-    elecsort <- as.numeric(attr(sort(f_plot$avg), "names"))
-    f_plot$norm <- f_plot$norm[as.character(elecsort),]
+    elec_order <- fsort
+  }
+  
+  f_plot$norm <- f_plot$norm[as.character(elec_order),]
+  
+  m <-  t(f_plot$norm)
+  attr(m, 'xlab') = 'Time'
+  attr(m, 'ylab') = 'Electrode'
+  attr(m, 'zlab') = 'Fragility'
+
+  if (check$elist) {
+    y <- paste0(check$elec_list$Label[elec_order], '(', elec_order, ')')
+    f_list <- paste0(check$elec_list$Label[fsort], '(', fsort, ')')
+  } else {
+    y <- elec_order
+    f_list <- fsort
   }
   
   f_plot_params <- list(
-    mat = f_plot$norm,
+    mat = m,
     x = 1:dim(f_plot$norm)[2],
-    y = 1:dim(f_plot$norm)[1],
+    y = y,
     zlim = c(0,1)
   )
+  
+  f_table_params <- data.frame(
+    # Ranking = 1:f_list_length,
+    Most.Fragile = rev(f_list)[1:f_list_length],
+    Least.Fragile = f_list[1:f_list_length]
+  )
+  
 } else {
-  f_plot <- NULL
+  f_plot <- list(trial = 'None')
 }
 
 selected <- list(
@@ -198,3 +207,5 @@ view_layout('fragility')
 rm(list = ls(all.names = TRUE)); rstudioapi::restartSession()
 module = rave::get_module(package = 'Fragility', module_id = 'fragility')
 rave::init_app(module)
+
+result = module()

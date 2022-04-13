@@ -25,3 +25,7 @@ generate_state_vectors}
 Finds the adjacency matrix A for a given time window. For use within the
 generate_adj_array function.
 }
+\examples{
+A is the 3D adjacency array in the following example, where k is the timewindow being calculated.
+A[,,k] <- find_adj_matrix(state_vectors, N = 85, t_window = 250, nlambda = 16, ncores = 16)
+}

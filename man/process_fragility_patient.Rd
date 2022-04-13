@@ -32,5 +32,5 @@ and halves the frequency if necessary.
 \examples{
 voltage <- module_tools$get_voltage()
 v <- voltage$get_data()
-pt_info_all <- process_fragility_patient(v = v, unit = 'mV', halve = FALSE)
+pt_info <- process_fragility_patient(v = v, unit = 'mV', halve = FALSE)
 }

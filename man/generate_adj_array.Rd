@@ -46,7 +46,7 @@ fragility map.
 adj_info <- generate_adj_array(
     t_window = 250,
     t_step = 125,
-    v = pt_info_all$v,
+    v = pt_info$v,
     trial_num = 1,
     nlambda = 16,
     ncores = 8
