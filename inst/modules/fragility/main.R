@@ -80,6 +80,11 @@ selected <- list(
   f = 'None'
 )
 
+possible <- list(
+  adj = trial$Trial[local_data$check$adj],
+  f = trial$Trial[local_data$check$f]
+)
+
 # does pt_info file exist in module_data?
 if (local_data$check$pt) {
   

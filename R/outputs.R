@@ -7,6 +7,11 @@ current_sel <- function(result, ...){
   paste0('Adjacency Matrix: ', sel$adj, ' | Fragility Map: ', sel$f)
 }
 
+possible_sel <- function(result, ...){
+  pos <- lapply(result$get_value('possible'), toString)
+  paste0('Adjacency Matrix: ', pos$adj, ' | Fragility Map: ', pos$f)
+}
+
 fragility_table <- function(result, ...) {
   f_table <- result$get_value('f_table_params')
   shiny::validate(shiny::need(!is.null(f_table), message = 'No valid fragility matrices detected!'))

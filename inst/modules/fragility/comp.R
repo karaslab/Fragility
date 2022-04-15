@@ -306,8 +306,15 @@ input_layout <- list(
 define_output(
   definition = verbatimTextOutput('current_sel'),
   title = 'Currently Loaded Trials',
-  width = 12,
+  width = 6,
   order = 1
+)
+
+define_output(
+  definition = verbatimTextOutput('possible_sel'),
+  title = 'Available (Processed) Trials',
+  width = 6,
+  order = 2
 )
 
 # define_output(
@@ -321,7 +328,7 @@ define_output(
   plotOutput('fragility_map'),
   title = 'Fragility Map',
   width = 9,
-  order = 2
+  order = 3
 )
 
 define_output(
@@ -329,7 +336,7 @@ define_output(
   title = 'Most/Least Fragile Electrodes',
   width = 3,
   #tags$style(type='text/css', '#most_fragile {white-space: pre-wrap;}'),
-  order = 3
+  order = 4
 )
 
 #for some reason this makes main execute an additional time
@@ -338,7 +345,7 @@ define_output_3d_viewer(
   message = 'Click here to reload viewer',
   title = 'Results on surface',
   height = '500px',
-  order = 4
+  order = 5
 )
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------
