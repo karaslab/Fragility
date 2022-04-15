@@ -7,12 +7,16 @@
 check_subject(subject_code, subject_dir, trials)
 }
 \arguments{
-\item{subject_code}{}
+\item{subject_code}{Character specifying subject's code}
 
-\item{subject_dir}{}
+\item{subject_dir}{List containing sub-directories of subject's folder in
+rave_data, from module_tools$get_subject_dirs()}
 
-\item{trials}{}
+\item{trials}{Integer vector with a number for each trial}
 }
 \description{
 check_subject
+}
+\examples{
+check <- check_subject('KAA', module_tools$get_subject_dirs(), 1:8)
 }

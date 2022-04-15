@@ -40,7 +40,7 @@ define_initialization({
   srate <- module_tools$get_sample_rate(original = TRUE)
   
   # check if subject has pt_info, adj_info, and f_info files
-  check <- check_subject(subject_code,subject_dir,trial$Trial)
+  local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
   print('initializing')
 })
 
@@ -151,10 +151,10 @@ define_input(
 
   init_expr = {
     print('initializing requested_conditions')
-    if (any(check$f)){
+    if (any(local_data$check$f)){
       label = 'Seizure Trial(s) for Fragility Map Display'
-      choices = module_tools$get_meta('trials')$Condition[check$f]
-      selected = module_tools$get_meta('trials')$Condition[check$f][1]
+      choices = module_tools$get_meta('trials')$Condition[local_data$check$f]
+      selected = module_tools$get_meta('trials')$Condition[local_data$check$f][1]
     } else {
       label = 'No valid fragility matrices detected! Please generate one above.'
       choices = character(0)

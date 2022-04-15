@@ -9,13 +9,8 @@ current_sel <- function(result, ...){
 
 fragility_table <- function(result, ...) {
   f_table <- result$get_value('f_table_params')
-  if(is.null(f_table)) {
-    return('No valid fragility matrices detected! Please follow the steps on the left to generate one.')
-  } else {
-    # paste0(f_text$num, ' most fragile electrodes: ', paste0(f_text$most, collapse = ', '))
-    # paste0(f_text$most)
-    f_table
-  }
+  shiny::validate(shiny::need(!is.null(f_table), message = 'No valid fragility matrices detected!'))
+  f_table
 }
 
 # least_fragile <- function(result, ...) {
@@ -29,7 +24,7 @@ fragility_table <- function(result, ...) {
 
 fragility_map <- function(result, ...) {
   f <- result$get_value('f_plot_params')
-  shiny::validate(shiny::need(!is.null(f), message = 'No valid fragility matrices found!'))
+  shiny::validate(shiny::need(!is.null(f), message = 'No valid fragility matrices detected! Please follow the steps on the left to generate one.'))
   
   y=f$y
   yi = seq_along(y)
