@@ -36,6 +36,9 @@ req(adj_conditions)
 
 # only use electrodes and trials requested
 requested_electrodes = dipsaus::parse_svec(text_electrode)
+if (!all(requested_electrodes %in% preload_info$electrodes)) {
+  stop('Please only select loaded electrodes.')
+}
 
 # trial for calculating adj and fragility matrix
 tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
@@ -77,32 +80,45 @@ selected <- list(
   f = 'None'
 )
 
+# does pt_info file exist in module_data?
 if (local_data$check$pt) {
+  
+  # load it in if the file exists but hasn't been loaded in yet
   if (!exists('pt_info')){
     pt_info <- readRDS(paste0(module_data,'/',subject_code,'_pt_info'))
   }
   
+  if (!all(as.character(preload_info$electrodes) %in% attr(pt_info$v, "dimnames")$Electrode)){
+    stop('Not all loaded electrodes are present in saved pt_info! Please reload the patient selecting only electrodes that were previously saved.')
+  }
+  
+  # same check but for adj_info with currently selected trial
   if (local_data$check$adj[tnum_adj]) {
+    
     if (!exists('adj_info')) {
+      # if the file exists but hasn't been loaded in yet
       adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
     } else if (adj_info$trial != tnum_adj) {
+      # if the user requests adj_info for a different trial
       adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
     }
+    
+    # save currently selected trial for "Currently Loaded Trials" display
     selected$adj <- adj_info$trial
+    
   } else {
     print('adj matrix for this trial doesnt exist yet. click generate adjacency matrix button')
     showNotification('No valid adjacency arrays detected. Please choose a trial and click the "Generate Adjacency Matrix" button.', duration = 10)
   }
+  
 } else {
   print("pt has not previously been loaded. click load patient button")
   showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
 }
 
-
-
 # fragility map stuff
-shiny::validate(shiny::need(any(local_data$check$f), message = 'No valid fragility matrices detected!'))
-#req(any(local_data$check$f))
+shiny::validate(shiny::need(!is.null(requested_conditions), message = 'No valid fragility matrices detected!'))
+# req(any(local_data$check$f))
 # print(paste0('local_data$check$f: ',local_data$check$f))
 if (length(tnum) > 1) {
   f_plot <- list(
@@ -142,9 +158,16 @@ if (sort_fmap == 'Electrode') {
   elec_order <- fsort
 }
 
-f_plot$norm <- f_plot$norm[as.character(elec_order),]
+if (is.vector(f_plot$norm)){
+  elec_order <- requested_electrodes
+  x <- 1:length(f_plot$norm)
+  m <- t(t(f_plot$norm))
+} else {
+  f_plot$norm <- f_plot$norm[as.character(elec_order),]
+  x <- 1:dim(f_plot$norm)[2]
+  m <- t(f_plot$norm)
+}
 
-m <-  t(f_plot$norm)
 attr(m, 'xlab') = 'Time'
 attr(m, 'ylab') = 'Electrode'
 attr(m, 'zlab') = 'Fragility'
@@ -159,7 +182,7 @@ if (local_data$check$elist) {
 
 f_plot_params <- list(
   mat = m,
-  x = 1:dim(f_plot$norm)[2],
+  x = x,
   y = y,
   zlim = c(0,1)
 )

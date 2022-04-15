@@ -34,6 +34,10 @@ fragility_map <- function(result, ...) {
     yi = .seq
   }
   
+  print(str(f$mat))
+  print(str(f$x))
+  print(str(f$y))
+  
   ravebuiltins:::draw_many_heat_maps(list(
     list(
       data = f$mat,
