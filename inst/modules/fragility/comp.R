@@ -41,6 +41,7 @@ define_initialization({
   
   # check if subject has pt_info, adj_info, and f_info files
   check <- check_subject(subject_code,subject_dir,trial$Trial)
+  print('initializing')
 })
 
 load_scripts(
@@ -133,6 +134,7 @@ define_input(
   init_args = c('choices', 'selected'),
 
   init_expr = {
+    print('initializing adj_conditions')
     # the module_tools object allows access to the meta data, including the "trial label" variable called Condition
     # The trial numbers and condition labels, are in the epoch file
     # rstudioapi::navigateToFile(file.path(rave::rave_options('data_dir'), 'demo','DemoSubject','rave', 'meta','epoch_auditory_onset.csv'))
@@ -148,6 +150,7 @@ define_input(
   init_args = c('label','choices', 'selected'),
 
   init_expr = {
+    print('initializing requested_conditions')
     if (any(check$f)){
       label = 'Seizure Trial(s) for Fragility Map Display'
       choices = module_tools$get_meta('trials')$Condition[check$f]
@@ -220,7 +223,7 @@ define_input(
 
   init_expr = {
     max = floor(length(preload_info$electrodes)/2)
-    value = floor(length(preload_info$electrodes)/8)
+    value = min(c(floor(length(preload_info$electrodes)/8), 10))
   }
 )
 

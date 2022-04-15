@@ -1,6 +1,15 @@
 # Put utility functions here, use `@export` to make function visible
 
+#' check_subject
+#'
+#' @param subject_code Character specifying subject's code
+#' @param subject_dir List containing sub-directories of subject's folder in
+#'   rave_data, from module_tools$get_subject_dirs()
+#' @param trials Integer vector with a number for each trial
+#'
 #' @export
+#' @examples
+#' check <- check_subject('KAA', module_tools$get_subject_dirs(), 1:8)
 check_subject <- function(subject_code, subject_dir, trials) {
   
   module_data <- subject_dir$module_data_dir

@@ -2,7 +2,6 @@
 
 export(check_subject)
 export(dev_Fragility)
-export(draw_heat_map)
 export(generate_adj_array)
 export(generate_fragility_matrix)
 export(process_fragility_patient)

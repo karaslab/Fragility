@@ -4,6 +4,7 @@ session = getDefaultReactiveDomain()
 static_data = dipsaus::fastmap2()
 
 local_data = reactiveValues(
+  check = NULL,
   brain_f = NULL,
   J = NULL,
   estimate = NULL,
@@ -12,18 +13,18 @@ local_data = reactiveValues(
 
 power_3d_fun = function(need_calc, side_width, daemon_env, viewer_proxy, ...){
   showNotification(p('Rebuild 3d viewer...'), id='power_3d_fun')
-  brain = rave::rave_brain2(subject = subject)
-  
+  brain <- rave::rave_brain2(subject = subject)
+
   if(is.null(brain)){
     rave::close_tab('power_explorer', 'Results on surface')
     showNotification('No surface file is available...', duration=2)
   }
-  
+
   shiny::validate(shiny::need(!is.null(brain), message = 'No surface/volume file found!'))
   re = NULL
-  
+
   display_side = isTRUE(isolate(input$power_3d_widget_side_display))
-  # 
+
   # zoom_level = shiny::isolate(viewer_proxy$main_camera$zoom)
   # controllers = viewer_proxy$get_controllers()
   # 
@@ -143,7 +144,28 @@ observeEvent(
 
 observeEvent(
   input$gen_adj, {
-    if (check$pt) {
+    if (local_data$check$pt) {
+      # Show estimated adj array calculation time
+      if (requested_tstep != "") {
+        S <- dim(pt_info$v)[2] # S is total number of timepoints
+        N <- dim(pt_info$v)[3]
+        
+        tstep <- as.numeric(requested_tstep)
+        
+        if(S %% tstep != 0) {
+          # truncate S to greatest number evenly divisible by timestep
+          S <- trunc(S/tstep) * tstep
+        }
+        J <- S/tstep - (requested_twindow/tstep) + 1
+        
+        local_data$J <- J
+        
+        t_estimate <- 1.5*J
+        t_estimate_hrs_min <- paste0(t_estimate%/%60, ' hours, ', round(t_estimate%%60, digits = 1), ' minutes')
+        local_data$estimate <- paste0('Estimated time: ', t_estimate_hrs_min)
+        # warning this H can be big
+        local_data$Hsize <- object.size(matrix(0, nrow = N*(requested_twindow-1), ncol = N^2)) + (200 * 1024^2)
+      }
       showModal(modalDialog(
         title = 'Confirmation',
         easyClose = F,
@@ -185,13 +207,14 @@ observeEvent(
     )
     adj_info <- append(adj_info, list(trial = tnum_adj))
     saveRDS(adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
   }
 )
 
 observeEvent(
   input$gen_f, {
-    if (check$pt) {
-      if (check$adj[tnum_adj]) {
+    if (local_data$check$pt) {
+      if (local_data$check$adj[tnum_adj]) {
         print('gen_f button clicked')
         f_info <- generate_fragility_matrix(
           A = adj_info$A,
@@ -199,9 +222,9 @@ observeEvent(
         )
         f_info <- append(f_info, list(trial = tnum_adj))
         saveRDS(f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
-        check <- check_subject(subject_code,module_data,trial$Trial)
+        local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
         updateSelectInput(session = session, inputId = 'requested_conditions',
-                          choices = module_tools$get_meta('trials')$Condition[check$f],
+                          choices = module_tools$get_meta('trials')$Condition[local_data$check$f],
                           selected = input$requested_conditions)
       } else {
         showNotification('No valid adjacency arrays detected. Please choose a trial and click the "Generate Adjacency Matrix" button.', duration = 10)
@@ -231,9 +254,9 @@ observeEvent(
 
 observeEvent(
   input$refresh_btn, {
-    check <- check_subject(subject_code,module_data,trial$Trial)
+    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     updateSelectInput(session = session, inputId = 'requested_conditions',
-                      choices = module_tools$get_meta('trials')$Condition[check$f],
+                      choices = module_tools$get_meta('trials')$Condition[local_data$check$f],
                       selected = input$requested_conditions)
   }
 )

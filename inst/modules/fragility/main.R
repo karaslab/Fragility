@@ -18,19 +18,20 @@ rave::rave_prepare(
 
 init_module('fragility', debug = TRUE)
 
-# rave::rave_prepare(
-#   subject = 'OnsetZone/KAA',
-#   electrodes =  c(1:43,45,46,61:72,89:116,145:158,196:209),
-#   epoch = 'KAA_sz',
-#   time_range = c(20,20),
-#   data_types = 'voltage',
-#   reference = 'car'
-# )
+rave::rave_prepare(
+  subject = 'OnsetZone/KAA',
+  electrodes =  c(1:116,129:244),
+  epoch = 'KAA_sz',
+  time_range = c(20,20),
+  data_types = 'voltage',
+  reference = 'car'
+)
 
 # >>>>>>>>>>>> Start ------------- [DO NOT EDIT THIS LINE] ---------------------
 ######' @auto=TRUE
 
 print('executing main')
+req(adj_conditions, requested_conditions)
 
 # only use electrodes and trials requested
 requested_electrodes = dipsaus::parse_svec(text_electrode)
@@ -38,14 +39,19 @@ requested_electrodes = dipsaus::parse_svec(text_electrode)
 # trial for calculating adj and fragility matrix
 tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
 
-# temporary fix for RAVE initialization errors
-if (is.null(adj_conditions)) {
-  tnum_adj <- 1
-}
+# temporary fixes for RAVE initialization errors (inputs being NULL)
 
-if(is.null(requested_tstep)) {
-  requested_tstep <- ""
-}
+# if (is.null(adj_conditions)) {
+#   tnum_adj <- 1
+# }
+# 
+# if(is.null(requested_conditions)) {
+#   tnum <- 1
+# }
+# 
+# if(is.null(requested_tstep)) {
+#   requested_tstep <- ""
+# }
 
 # trial(s) for display on fragility map
 tnum <- trial$Trial[trial$Condition %in% requested_conditions]
@@ -60,34 +66,15 @@ tnum <- trial$Trial[trial$Condition %in% requested_conditions]
 # 
 # srate <- module_tools$get_sample_rate(original = TRUE)
 
-# check if subject has pt_info, adj_info, and f_info files
-check <- check_subject(subject_code,subject_dir,trial$Trial)
+# local_data$check if subject has pt_info, adj_info, and f_info files
+# local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+local_data$check <- check
+# print(str(local_data$check))
 
-if (check$pt) {
+if (local_data$check$pt) {
   pt_info <- readRDS(paste0(module_data,'/',subject_code,'_pt_info'))
   
-  # Show estimated adj array calculation time
-  if (requested_tstep != "") {
-    S <- dim(pt_info$v)[2] # S is total number of timepoints
-    N <- dim(pt_info$v)[3]
-    
-    tstep <- as.numeric(requested_tstep)
-    
-    if(S %% tstep != 0) {
-      # truncate S to greatest number evenly divisible by timestep
-      S <- trunc(S/tstep) * tstep
-    }
-    J <- S/tstep - (requested_twindow/tstep) + 1
-    
-    local_data$J <- J
-    
-    t_estimate <- 1.5*J
-    t_estimate_hrs_min <- paste0(t_estimate%/%60, ' hours, ', round(t_estimate%%60, digits = 1), ' minutes')
-    local_data$estimate <- paste0('Estimated time: ', t_estimate_hrs_min)
-    local_data$Hsize <- object.size(matrix(0, nrow = N*(requested_twindow-1), ncol = N^2)) + (200 * 1024^2)
-  }
-  
-  if (check$adj[tnum_adj]) {
+  if (local_data$check$adj[tnum_adj]) {
     adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
   } else {
     adj_info <- list(trial = "None")
@@ -101,8 +88,8 @@ if (check$pt) {
 }
 
 # fragility map stuff
-# do.call(req, split(check$f, seq_along(check$f)))
-if (any(check$f)){
+# do.call(req, split(local_data$check$f, seq_along(local_data$check$f)))
+if (any(local_data$check$f)){
   if (length(tnum) > 1) {
     f_plot <- list(
       norm = matrix(data = 0, nrow = dim(adj_info$A)[1], ncol = dim(adj_info$A)[3]),
@@ -144,9 +131,9 @@ if (any(check$f)){
   attr(m, 'ylab') = 'Electrode'
   attr(m, 'zlab') = 'Fragility'
 
-  if (check$elist) {
-    y <- paste0(check$elec_list$Label[elec_order], '(', elec_order, ')')
-    f_list <- paste0(check$elec_list$Label[fsort], '(', fsort, ')')
+  if (local_data$check$elist) {
+    y <- paste0(local_data$check$elec_list$Label[elec_order], '(', elec_order, ')')
+    f_list <- paste0(local_data$check$elec_list$Label[fsort], '(', fsort, ')')
   } else {
     y <- elec_order
     f_list <- fsort
@@ -200,6 +187,16 @@ rave::rave_prepare(
   data_types = 'voltage',
   reference = 'car'
 )
+
+rave::rave_prepare(
+  subject = 'OnsetZone/KAA',
+  electrodes =  c(1:116,129:244),
+  epoch = 'KAA_sz',
+  time_range = c(20,20),
+  data_types = 'voltage',
+  reference = 'car'
+)
+
 view_layout('fragility')
 
 # Production - Deploy as RAVE module
