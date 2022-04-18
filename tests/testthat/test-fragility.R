@@ -1,41 +1,38 @@
 require(glmnet)
 require(doMC)
 
-gen_fragility_patient <- function(subject_code, block, elec, unit, halve = FALSE) {
-  v2 <- readRDS(paste0('/Volumes/bigbrain/oliver-r-projects/', subject_code, ' R Data/', subject_code, '_car_voltage'))
-  preload_info <- readRDS(paste0('/Volumes/bigbrain/oliver-r-projects/', subject_code, ' R Data/', subject_code, '_car_info'))
+process_fragility_patient <- function(v, unit, srate, halve = FALSE) {
+  print('loading fragility patient')
   
-  cond = preload_info$condition
-  
-  elec <- as.character(elec)
-  trial_num <- match(block,cond)
-  # trial_num <- match(paste0('seizure (',block,')'), cond)
-  # N <- length(elec) # number of electrodes
-  
-  v1 <- v2[,,elec] # assign only specified electrodes
+  newunit <- 'uV'
   
   if (unit != 'uV') {
     if (unit == 'nV') {
-      v1 <- v1/1000
+      v <- v/1000
     } else if (unit == 'mV') {
-      v1 <- v1*1000
+      v <- v*1000
     } else {
-      stop('Accepted units are uV, nV, or mV')
+      warning('Accepted units are uV, nV, or mV')
+      newunit <- unit
     }
   }
   
-  
   if (halve) {
-    v1 <- v1[,seq(1,ncol(v2),2),] # halves the frequency
+    v <- v[,seq(1,ncol(v),2),] # halves the frequency
+    srate <- srate/2
   }
   
   pt_info <- list(
-    v = v1,
-    trial = trial_num
+    v = v,
+    trials = as.numeric(attr(v, "dimnames")[[1]]),
+    unit = newunit,
+    srate = srate
   )
 }
 
 generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) {
+  print('generating adj array')
+  
   S <- dim(v)[2] # S is total number of timepoints
   N <- dim(v)[3] # N is number of electrodes
   
@@ -49,7 +46,7 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
   
   doMC::registerDoMC(cores = ncores)
   
-  for (k in 1:J) {
+  for (k in 1:1) {
     start_time <- Sys.time()
     print(paste0('current timewindow: ', k, ' out of ', J))
     t_start <- 1+(k-1)*t_step
@@ -71,6 +68,8 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
 }
 
 generate_fragility_matrix <- function(A, elec, lim = 1i) {
+  # print('generating fragility matrix')
+  
   N <- dim(A)[1]
   J <- dim(A)[3]
   f_vals <- matrix(nrow = N, ncol = J)
@@ -88,10 +87,16 @@ generate_fragility_matrix <- function(A, elec, lim = 1i) {
   
   f_norm <- f_vals
   
-  # scale fragility values from 0 to 1 with 1 being most fragile
+  # # scale fragility values from 0 to 1 with 1 being most fragile
+  # for (j in 1:J) {
+  #   max_f <- max(f_vals[,j])
+  #   f_norm[,j] <- sapply(f_vals[,j], function(x) (max_f - x) / max_f)
+  # }
+  
+  # scale fragility values from -1 to 1 with 1 being most fragile
   for (j in 1:J) {
     max_f <- max(f_vals[,j])
-    f_norm[,j] <- sapply(f_vals[,j], function(x) (max_f - x) / max_f)
+    f_norm[,j] <- sapply(f_vals[,j], function(x) 2*(max_f - x)/max_f - 1)
   }
   
   avg_f <- rowMeans(f_norm)
@@ -137,9 +142,12 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   
   # solve system using glmnet package least squares, with L2-norm regularization
   # aka ridge filtering
-  
+  doMC::registerDoMC(cores = 4)
   # find optimal lambda
+  start_time <- Sys.time()
   cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = TRUE, nlambda = nlambda)
+  end_time <- Sys.time()
+  print(end_time - start_time)
   lambdas <- rev(cv.ridge$lambda)
   
   test_lambda <- function(l, H, b, lambdas, ncores) {
@@ -161,7 +169,10 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   while (length(stable_i) == 0) {
     
     if ((l+ncores-1) <= length(lambdas)) {
+      start_time <- Sys.time()
       results <- rave::lapply_async3(lambdas[l:(l+ncores-1)], test_lambda, H = H, b = b, .ncores = ncores)
+      end_time <- Sys.time()
+      print(end_time - start_time)
       stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
     } else {
       results <- rave::lapply_async3(lambdas[l:length(lambdas)], test_lambda, H = H, b = b, .ncores = ncores)
@@ -199,41 +210,22 @@ find_fragility <- function(node, A_k, N, limit) {
   norm(perturb_mat, type = '2')
 }
 
-requested_electrodes <- c(1:24,26:36,42:43,46:54,56:70,72:95)
+pt_info <- readRDS('/Users/oliverzhou/rave_data/data_dir/OnsetZone/PT01/rave/module_data/PT01_pt_info')
 
-pt_info <- gen_fragility_patient(
-  subject_code = 'PT01',
-  block = 'seizure (1)',
-  elec = requested_electrodes,
-  unit = 'nV'
-)
+# pt_info <- gen_fragility_patient(
+#   subject_code = 'PT01',
+#   block = 'seizure (1)',
+#   elec = requested_electrodes,
+#   unit = 'nV'
+# )
 
+options(future.globals.maxSize = 20000 * 1024^2)
 adj_info <- generate_adj_array(
-  t_window = 250, 
-  t_step = 250, 
-  v = pt_info$v, 
-  trial_num = pt_info$trial,
+  t_window = 300,
+  t_step = 150,
+  v = pt_info$v,
+  trial_num = 1,
   nlambda = 16,
-  ncores = 8
+  ncores = 16
 )
 
-f_info <- generate_fragility_matrix(
-  A = adj_info$A,
-  elec = requested_electrodes
-)
-
-f_plot_params <- list(
-  mat = f_info$norm,
-  x = 1:J,
-  y = 1:N,
-  zlim = c(0,1)
-)
-
-ridge <- glmnet::glmnet(H, b, alpha = 0, lambda = 50)
-adj_matrix <-  matrix(ridge$beta, nrow = N, ncol = N, byrow = TRUE)
-max(abs(eigen(adj_matrix, only.values = TRUE)$values))
-
-image(z = t(f_info$norm), x=1:160,
-      y = 1:N, # as.numeric(elec),
-      zlim=c(0,1),
-      col = colorRampPalette(c('blue', 'green', 'red'))(101))

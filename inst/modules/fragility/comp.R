@@ -29,6 +29,11 @@ mount_demo_subject()
 
 define_initialization({
   # Enter code to handle data when a new subject is loaded
+  
+  rave_checks('voltage referenced')
+  volt <- module_tools$get_voltage()
+  local_data$v <- volt$get_data()
+  
   subject_dir <- module_tools$get_subject_dirs()
   module_data <- subject_dir$module_data_dir
   if (!file.exists(module_data)){
@@ -41,6 +46,7 @@ define_initialization({
   
   # check if subject has pt_info, adj_info, and f_info files
   local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+  
   print('initializing')
 })
 

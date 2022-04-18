@@ -4,6 +4,7 @@ session = getDefaultReactiveDomain()
 static_data = dipsaus::fastmap2()
 
 local_data = reactiveValues(
+  v = NULL,
   check = NULL,
   brain_f = NULL,
   J = NULL,
@@ -127,45 +128,32 @@ power_3d_fun = function(need_calc, side_width, daemon_env, viewer_proxy, ...){
 observeEvent(
   input$process_pt, {
     print('process_pt button clicked')
-    volt <- module_tools$get_voltage()
-    v <- volt$get_data()
+    # volt <- module_tools$get_voltage()
+    # v <- volt$get_data()
+    print(str(local_data$v))
     pt_info <- process_fragility_patient(
-      v = v,
+      v = local_data$v,
       unit = input$recording_unit,
       srate = srate,
       halve = FALSE
     )
     saveRDS(pt_info, file = paste0(module_data,'/',subject_code,'_pt_info'))
-    print(trial)
-    print(tnum)
-    print(requested_electrodes)
+    # print(trial)
+    # print(tnum)
+    # print(requested_electrodes)
   }
 )
 
 observeEvent(
   input$gen_adj, {
     if (local_data$check$pt) {
+      showNotification('Calculating estimated time...', id = 'loadingModal')
       # Show estimated adj array calculation time
       if (requested_tstep != "") {
-        S <- dim(pt_info$v)[2] # S is total number of timepoints
-        N <- dim(pt_info$v)[3]
-        
-        tstep <- as.numeric(requested_tstep)
-        
-        if(S %% tstep != 0) {
-          # truncate S to greatest number evenly divisible by timestep
-          S <- trunc(S/tstep) * tstep
-        }
-        J <- S/tstep - (requested_twindow/tstep) + 1
-        
-        local_data$J <- J
-        
-        t_estimate <- 1.5*J
-        t_estimate_hrs_min <- paste0(t_estimate%/%60, ' hours, ', round(t_estimate%%60, digits = 1), ' minutes')
-        local_data$estimate <- paste0('Estimated time: ', t_estimate_hrs_min)
-        # warning this H can be big
-        local_data$Hsize <- object.size(matrix(0, nrow = N*(requested_twindow-1), ncol = N^2)) + (200 * 1024^2)
+        print(requested_twindow)
+        est <- estimate_time(pt_info, as.numeric(requested_tstep), requested_twindow)
       }
+      removeNotification(id = 'loadingModal')
       showModal(modalDialog(
         title = 'Confirmation',
         easyClose = F,
@@ -178,10 +166,10 @@ observeEvent(
           p('Generate adjacency array for: '),
           tags$blockquote(paste0(local_data$J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
           p('Required futures.globals.maxSize: '),
-          tags$blockquote(format(local_data$Hsize, units = 'MB')),
+          tags$blockquote(format(est$Hsize, units = 'MB')),
           p('This might take a while.'),
           hr(),
-          local_data$estimate
+          est$time
         ))
       ))
     } else {
@@ -191,12 +179,12 @@ observeEvent(
 )
 
 observeEvent(input$cancel, {
-  # little trick: if server is running other tasks, modal will not be removed
   removeModal()
 })
 
 observeEvent(
   input$ok, {
+    options(future.globals.maxSize = input$future_maxsize * 1024^2)
     adj_info <- generate_adj_array(
       t_window = input$requested_twindow,
       t_step = as.numeric(input$requested_tstep),
@@ -208,6 +196,8 @@ observeEvent(
     adj_info <- append(adj_info, list(trial = tnum_adj))
     saveRDS(adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
     local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    showNotification('Adjacency array generation finished!')
+    removeModal()
   }
 )
 
