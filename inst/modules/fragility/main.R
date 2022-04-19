@@ -40,17 +40,19 @@ if (local_data$check$pt && is.null(isolate(local_data$pt_info))) {
   removeNotification('pt_loading')
 }
 
-# print(adj_conditions)
-# req(adj_conditions)
-# 
-# # only use electrodes and trials requested
-# requested_electrodes = dipsaus::parse_svec(text_electrode)
-# if (!all(requested_electrodes %in% preload_info$electrodes)) {
-#   stop('Please only select loaded electrodes.')
-# }
-# 
-# # trial for calculating adj and fragility matrix
-# tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
+possible <- list(
+  adj = trial$Trial[local_data$check$adj],
+  f = trial$Trial[local_data$check$f]
+)
+
+# only use electrodes and trials requested
+requested_electrodes = dipsaus::parse_svec(text_electrode)
+if (!all(requested_electrodes %in% preload_info$electrodes)) {
+  stop('Please only select loaded electrodes.')
+}
+
+# trial for calculating adj and fragility matrix
+tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
 # 
 # # temporary fixes for RAVE initialization errors (inputs being NULL)
 # 
@@ -66,8 +68,8 @@ if (local_data$check$pt && is.null(isolate(local_data$pt_info))) {
 # #   requested_tstep <- ""
 # # }
 # 
-# # trial(s) for display on fragility map
-# tnum <- trial$Trial[trial$Condition %in% requested_conditions]
+# trial(s) for display on fragility map
+tnum <- trial$Trial[trial$Condition %in% requested_conditions]
 # 
 # # # where subject's pt_info, adj_info, and f_info RDS files are saved
 # # subject_dir <- module_tools$get_subject_dirs()
@@ -89,10 +91,6 @@ if (local_data$check$pt && is.null(isolate(local_data$pt_info))) {
 #   f = 'None'
 # )
 # 
-# possible <- list(
-#   adj = trial$Trial[local_data$check$adj],
-#   f = trial$Trial[local_data$check$f]
-# )
 # 
 # # does pt_info file exist in module_data?
 # if (local_data$check$pt) {

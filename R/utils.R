@@ -81,6 +81,7 @@ estimate_time <- function(pt_info, tstep, twindow) {
   
   time_estimate <- list(
     time = est_time,
-    Hsize = Hsize
+    Hsize = Hsize,
+    J = J
   )
 }

@@ -216,10 +216,6 @@ define_input(
 )
 
 define_input(
-  numericInput(inputId = 'future_maxsize', label='future.globals.maxSize (in megabytes)', min=500, max=20000, value=2000, step=500),
-)
-
-define_input(
   selectInput(inputId = 'sort_fmap', choices = c('Electrode','Fragility'), selected = 'Electrode', label='Sort Fragility Map By:'),
 )
 
@@ -264,12 +260,11 @@ input_layout <- list(
     'requested_tstep',
     'requested_nlambda',
     'requested_ncores',
-    'future_maxsize',
     'adj_conditions',
     'gen_adj',
     'gen_f'
   ),
-  'Step 3: Fragility Map' = list(
+  '[-]Step 3: Fragility Map' = list(
     'requested_conditions',
     'text_electrode',
     'sort_fmap',

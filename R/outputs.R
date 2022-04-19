@@ -2,8 +2,15 @@
 # will be used to render outputs
 
 current_sel <- function(result, ...){
-  sel <- result$get_value('selected')
-  sel$f <- toString(sel$f)
+  sel <- result$get_value('local_data')$selected
+  if (sel$adj == ''){
+    sel$adj <- 'None'
+  }
+  if (sel$f == ''){
+    sel$f <- 'None'
+  } else {
+    sel$f <- toString(sel$f)
+  }
   paste0('Adjacency Matrix: ', sel$adj, ' | Fragility Map: ', sel$f)
 }
 

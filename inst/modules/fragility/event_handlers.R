@@ -7,10 +7,15 @@ local_data = reactiveValues(
   v = NULL,
   check = NULL,
   pt_info = NULL,
+  adj_info = NULL,
   brain_f = NULL,
   J = NULL,
   estimate = NULL,
-  Hsize = NULL
+  Hsize = NULL,
+  selected = list(
+    adj = '',
+    f = ''
+  )
 )
 
 observeEvent(
@@ -34,10 +39,7 @@ observeEvent(
     if (local_data$check$pt) {
       showNotification('Calculating estimated time...', id = 'loadingModal')
       # Show estimated adj array calculation time
-      if (requested_tstep != "") {
-        print(requested_twindow)
-        est <- estimate_time(pt_info, as.numeric(requested_tstep), requested_twindow)
-      }
+      local_data$est <- estimate_time(local_data$pt_info, as.numeric(requested_tstep), requested_twindow)
       removeNotification(id = 'loadingModal')
       showModal(modalDialog(
         title = 'Confirmation',
@@ -49,12 +51,12 @@ observeEvent(
         fluidRow(column(
           width = 12,
           p('Generate adjacency array for: '),
-          tags$blockquote(paste0(local_data$J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
+          tags$blockquote(paste0(local_data$est$J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
           p('Required futures.globals.maxSize: '),
-          tags$blockquote(format(est$Hsize, units = 'MB')),
+          tags$blockquote(format(local_data$est$Hsize, units = 'MB')),
           p('This might take a while.'),
           hr(),
-          est$time
+          local_data$est$time
         ))
       ))
     } else {
@@ -69,17 +71,17 @@ observeEvent(input$cancel, {
 
 observeEvent(
   input$ok, {
-    options(future.globals.maxSize = input$future_maxsize * 1024^2)
-    adj_info <- generate_adj_array(
+    options(future.globals.maxSize = local_data$est$Hsize * 1024^2)
+    local_data$adj_info <- generate_adj_array(
       t_window = input$requested_twindow,
       t_step = as.numeric(input$requested_tstep),
-      v = pt_info$v,
+      v = local_data$pt_info$v,
       trial_num = tnum_adj,
       nlambda = input$requested_nlambda,
       ncores = input$requested_ncores
     )
-    adj_info <- append(adj_info, list(trial = tnum_adj))
-    saveRDS(adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    local_data$adj_info <- append(local_data$adj_info, list(trial = tnum_adj))
+    saveRDS(local_data$adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
     local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     showNotification('Adjacency array generation finished!')
     removeModal()
@@ -102,7 +104,7 @@ observeEvent(
                           choices = module_tools$get_meta('trials')$Condition[local_data$check$f],
                           selected = input$requested_conditions)
       } else {
-        showNotification('No valid adjacency arrays detected. Please choose a trial and click the "Generate Adjacency Matrix" button.', duration = 10)
+        showNotification('This trial does not yet have an adjacency array, which is required for generating the fragility matrix. Click the "Generate Adjacency Array" button first.')
       }
     } else {
       showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
@@ -112,6 +114,19 @@ observeEvent(
 
 observeEvent(
   input$adj_conditions, {
+    t <- trial$Trial[trial$Condition %in% input$adj_conditions]
+    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    if (local_data$check$adj[t]) {
+      if (is.null(local_data$adj_info)) {
+        # if the file exists but hasn't been loaded in yet
+        local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
+      } else if (local_data$adj_info$trial != t) {
+        # if the user requests adj_info for a different trial
+        local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
+      }
+      # save currently selected trial for "Currently Loaded Trials" display
+      local_data$selected$adj <- local_data$adj_info$trial
+    }
     updateActionButton(session = session, inputId = 'gen_adj', 
                        label = paste0('Generate Adjacency Array for ', input$adj_conditions))
     updateActionButton(session = session, inputId = 'gen_f', 
