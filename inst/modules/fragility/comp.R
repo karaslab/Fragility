@@ -249,6 +249,10 @@ define_input(
   actionButton(inputId = 'refresh_btn', label='Refresh'),
 )
 
+define_input(
+  actionButton(inputId = 'test', label='test'),
+)
+
 # the input_layout list is used by rave to determine order and grouping of layouts
 input_layout <- list(
   '[-]Step 1: Load Patient' = list(
