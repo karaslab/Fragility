@@ -47,18 +47,26 @@ if (local_data$check$pt && is.null(isolate(local_data$pt_info))) {
 }
 
 possible <- list(
+  pt = local_data$check$pt,
   adj = trial$Trial[local_data$check$adj],
   f = trial$Trial[local_data$check$f]
 )
 
 # only use electrodes and trials requested
-local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
-if (!all(local_data$requested_electrodes %in% preload_info$electrodes)) {
-  stop('Please only select loaded electrodes.')
-}
+# local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
 
-# trial for calculating adj and fragility matrix
-tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
+# initialize adj_info if available
+
+if (any(local_data$check$adj) && is.null(isolate(local_data$adj_info))) {
+  print('loading adj_info first time')
+  showNotification('Loading existing adjacency array...', id = 'adj_loading')
+  tnum_adj <- which(local_data$check$adj)[1]
+  local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+  local_data$selected$adj <- local_data$adj_info$trial
+  removeNotification('adj_loading')
+} else {
+  tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
+}
 # 
 # # temporary fixes for RAVE initialization errors (inputs being NULL)
 # 

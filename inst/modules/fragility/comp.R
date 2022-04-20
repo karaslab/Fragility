@@ -48,7 +48,6 @@ define_initialization({
   local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
   
   print('initializing')
-  initialized <- TRUE
 })
 
 load_scripts(
@@ -243,24 +242,40 @@ define_input(
 )
 
 define_input(
-  actionButton(inputId = 'draw_f_map', label='Draw Fragility Map!'),
+  checkboxInput(inputId = 'auto_calc', label='Auto-recalculate?', value = TRUE),
+)
+
+define_input(
+  actionButton(inputId = 'draw_f_map', label='Calculate Fragility!'),
+  
+  init_args = c('label'),
+  
+  init_expr = {
+    if (any(local_data$check$f)){
+      label = 'Calculate Fragility!'
+      shinyjs::enable('draw_f_map')
+    } else {
+      label = 'No valid fragility matrices detected!'
+      shinyjs::disable('draw_f_map')
+    }
+  }
 )
 
 define_input(
   actionButton(inputId = 'refresh_btn', label='Refresh'),
 )
 
-define_input(
-  actionButton(inputId = 'test', label='test'),
-)
+# define_input(
+#   actionButton(inputId = 'test', label='test'),
+# )
 
 # the input_layout list is used by rave to determine order and grouping of layouts
 input_layout <- list(
-  '[-]Step 1: Load Patient' = list(
+  '[-]Step 1: Process Patient' = list(
     'recording_unit',
     'process_pt'
   ),
-  '[-]Step 2: Adjacency Matrix' = list(
+  '[-]Step 2: Adjacency Array' = list(
     'requested_twindow',
     'requested_tstep',
     'requested_nlambda',
@@ -274,7 +289,10 @@ input_layout <- list(
     'text_electrode',
     'sort_fmap',
     'f_list_length',
-    'draw_f_map',
+    'auto_calc',
+    'draw_f_map'
+  ),
+  'Re-check Files' = list(
     'refresh_btn'
   )
 )
@@ -317,23 +335,16 @@ input_layout <- list(
 define_output(
   definition = verbatimTextOutput('current_sel'),
   title = 'Currently Loaded Trials',
-  width = 6,
+  width = 5,
   order = 1
 )
 
 define_output(
   definition = verbatimTextOutput('possible_sel'),
   title = 'Available (Processed) Trials',
-  width = 6,
+  width = 7,
   order = 2
 )
-
-# define_output(
-#   definition = verbatimTextOutput('least_fragile'),
-#   title = 'Least Fragile Electrodes',
-#   width = 4,
-#   order = 3
-# )
 
 define_output(
   plotOutput('fragility_map'),

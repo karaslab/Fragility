@@ -45,6 +45,7 @@ observeEvent(
 
 observeEvent(
   input$gen_adj, {
+    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     if (local_data$check$pt) {
       showNotification('Calculating estimated time...', id = 'loading_modal')
       # Show estimated adj array calculation time
@@ -91,7 +92,6 @@ observeEvent(
     )
     local_data$adj_info <- append(local_data$adj_info, list(trial = tnum_adj))
     saveRDS(local_data$adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
-    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     showNotification('Adjacency array generation finished!')
     removeModal()
   }
@@ -99,6 +99,7 @@ observeEvent(
 
 observeEvent(
   input$gen_f, {
+    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     if (local_data$check$pt) {
       if (local_data$check$adj[tnum_adj]) {
         print('gen_f button clicked')
@@ -116,14 +117,14 @@ observeEvent(
         showNotification('This trial does not yet have an adjacency array, which is required for generating the fragility matrix. Click the "Generate Adjacency Array" button first.')
       }
     } else {
-      showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".', duration = 10)
+      showNotification('Patient has not been processed yet. Please click the "Pre-process Patient" button under "Load Patient".')
     }
   }
 )
 
 observeEvent(
   input$adj_conditions, {
-    if (!is.null(input$adj_conditions)) {
+    if (exists('trial')) {
       print('updating adj conditions')
       
       t <- trial$Trial[trial$Condition %in% input$adj_conditions]
@@ -149,20 +150,61 @@ observeEvent(
 
 observeEvent(
   input$text_electrode, {
-    r_elec = dipsaus::parse_svec(input$text_electrode)
+    local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
     updateNumericInput(session = session, inputId = 'f_list_length', 
-                       max = floor(length(r_elec)/2), 
-                       value = max(c(floor(length(r_elec)/8), 1)))
+                       max = floor(length(local_data$requested_electrodes)/2), 
+                       value = max(c(min(c(floor(length(local_data$requested_electrodes)/2), 10)), 1)))
   }
 )
 
+observeEvent(
+  list(
+    input$requested_conditions,
+    input$text_electrode,
+    input$sort_fmap,
+    input$f_list_length
+  ), {
+    if (shiny::isTruthy(input$auto_calc) & !is.null(local_data$requested_electrodes)) {
+      local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
+      if (!all(local_data$requested_electrodes %in% preload_info$electrodes)) {
+        stop('Please only select loaded electrodes.')
+      }
+      if (!is.null(input$requested_conditions)) {
+        showNotification('Updating fragility map...', id = 'updating_f')
+        tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
+        f_outputs <- draw_f_map_table(
+          tnum = tnum, 
+          adj_info = local_data$adj_info, 
+          f_path = paste0(module_data,'/',subject_code,'_f_info_trial_'), 
+          subject_code = subject_code,
+          requested_electrodes = local_data$requested_electrodes,
+          sort_fmap = input$sort_fmap,
+          check = local_data$check,
+          f_list_length = input$f_list_length
+        )
+        
+        local_data$brain_f <- f_outputs$brain_f
+        local_data$f_plot_params <- f_outputs$f_plot_params
+        local_data$f_table_params <- f_outputs$f_table_params
+        local_data$selected$f <- f_outputs$sel
+        
+        removeNotification('updating_f')
+      } else {
+        local_data$brain_f <- NULL
+        local_data$f_plot_params <- NULL
+        local_data$f_table_params <- NULL
+        local_data$selected$f <- ''
+      }
+    }
+  }
+)
 # observeEvent(
 #   input$requested_conditions, {
 #     if (!is.null(local_data$requested_electrodes)) {
 #       print('updating requested conditions')
 #       showNotification('Updating fragility map...', id = 'updating_f')
 #       tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
-#       print(tnum)
+#       # print(tnum)
 #       # if (length(tnum) > 1) {
 #       #   f_plot <- list(
 #       #     norm = matrix(data = 0, nrow = dim(local_data$adj_info$A)[1], ncol = dim(local_data$adj_info$A)[3]),
@@ -179,22 +221,22 @@ observeEvent(
 #       #   f <- readRDS(paste0(module_data,'/',subject_code,'_f_info_trial_',tnum))
 #       #   f_plot <- f[2:4]
 #       # }
-#       # 
+#       #
 #       # f_plot$norm <- f_plot$norm[as.character(local_data$requested_electrodes),]
 #       # f_plot$avg <- f_plot$avg[as.character(local_data$requested_electrodes)]
 #       # local_data$brain_f <- data.frame("Subject"=subject_code,
 #       #                                  "Electrode"=local_data$requested_electrodes,"Time"=0,
 #       #                                  "Avg_Fragility"=f_plot$avg)
-#       # 
+#       #
 #       # elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
 #       # fsort <- as.numeric(attr(sort(f_plot$avg), "names"))
-#       # 
+#       #
 #       # if (sort_fmap == 'Electrode') {
 #       #   elec_order <- elecsort
 #       # } else if (sort_fmap == 'Fragility') {
 #       #   elec_order <- fsort
 #       # }
-#       # 
+#       #
 #       # if (is.vector(f_plot$norm)){
 #       #   elec_order <- local_data$requested_electrodes
 #       #   x <- 1:length(f_plot$norm)
@@ -204,11 +246,11 @@ observeEvent(
 #       #   x <- 1:dim(f_plot$norm)[2]
 #       #   m <- t(f_plot$norm)
 #       # }
-#       # 
+#       #
 #       # attr(m, 'xlab') = 'Time'
 #       # attr(m, 'ylab') = 'Electrode'
 #       # attr(m, 'zlab') = 'Fragility'
-#       # 
+#       #
 #       # if (local_data$check$elist) {
 #       #   y <- paste0(local_data$check$elec_list$Label[elec_order], '(', elec_order, ')')
 #       #   f_list <- paste0(local_data$check$elec_list$Label[fsort], '(', fsort, ')')
@@ -216,35 +258,35 @@ observeEvent(
 #       #   y <- elec_order
 #       #   f_list <- fsort
 #       # }
-#       # 
+#       #
 #       # local_data$f_plot_params <- list(
 #       #   mat = m,
 #       #   x = x,
 #       #   y = y,
 #       #   zlim = c(0,1)
 #       # )
-#       # 
+#       #
 #       # local_data$f_table_params <- data.frame(
 #       #   # Ranking = 1:f_list_length,
 #       #   Most.Fragile = rev(f_list)[1:f_list_length],
 #       #   Least.Fragile = f_list[1:f_list_length]
 #       # )
-#       # 
-#       # 
-#       # 
+#       #
+#       #
+#       #
 #       # local_data$selected$f <- f_plot$trial
 #       f_outputs <- draw_f_map_table(
-#         tnum = tnum, 
-#         adj_info = local_data$adj_info, 
-#         f_path = paste0(module_data,'/',subject_code,'_f_info_trial_'), 
+#         tnum = tnum,
+#         adj_info = local_data$adj_info,
+#         f_path = paste0(module_data,'/',subject_code,'_f_info_trial_'),
 #         requested_electrodes = requested_electrodes
 #       )
-#       
+# 
 #       local_data$brain_f <- f_outputs$brain_f
 #       local_data$f_plot_params <- f_outputs$f_plot_params
 #       local_data$f_table_params <- f_outputs$f_table_params
 #       local_data$selected$f <- f_outputs$sel
-#       
+# 
 #       removeNotification('updating_f')
 #     }
 #   }
@@ -253,6 +295,10 @@ observeEvent(
 observeEvent(
   input$draw_f_map, {
     showNotification('Updating fragility map...', id = 'updating_f')
+    local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
+    if (!all(local_data$requested_electrodes %in% preload_info$electrodes)) {
+      stop('Please only select loaded electrodes.')
+    }
     tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
     f_outputs <- draw_f_map_table(
       tnum = tnum, 
@@ -278,8 +324,13 @@ observeEvent(
   input$refresh_btn, {
     showNotification('Re-reading patient info...', id = 'refreshing')
     local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    if (local_data$check$pt) {
+      local_data$pt_info <- readRDS(paste0(module_data,'/',subject_code,'_pt_info'))
+    }
     
-    local_data$pt_info <- readRDS(paste0(module_data,'/',subject_code,'_pt_info'))
+    if (local_data$check$adj[tnum_adj]) {
+      local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    }
     
     updateSelectInput(session = session, inputId = 'requested_conditions',
                       choices = module_tools$get_meta('trials')$Condition[local_data$check$f],

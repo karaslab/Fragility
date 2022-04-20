@@ -342,8 +342,6 @@ find_fragility <- function(node, A_k, N, limit) {
 }
 
 draw_f_map_table <- function(tnum, adj_info, f_path, subject_code, requested_electrodes, sort_fmap, check, f_list_length) {
-  print(tnum)
-  print(str(adj_info$A))
   if (length(tnum) > 1) {
     f_plot <- list(
       norm = matrix(data = 0, nrow = dim(adj_info$A)[1], ncol = dim(adj_info$A)[3]),

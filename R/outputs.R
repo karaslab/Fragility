@@ -11,17 +11,17 @@ current_sel <- function(result, ...){
   } else {
     sel$f <- toString(sel$f)
   }
-  paste0('Adjacency Matrix: ', sel$adj, ' | Fragility Map: ', sel$f)
+  paste0('Adjacency Array: ', sel$adj, ' | Fragility Map: ', sel$f)
 }
 
 possible_sel <- function(result, ...){
   pos <- lapply(result$get_value('possible'), toString)
-  paste0('Adjacency Matrix: ', pos$adj, ' | Fragility Map: ', pos$f)
+  paste0('Pt Processed? ', pos$pt, ' | Adjacency Array: ', pos$adj, ' | Fragility Map: ', pos$f)
 }
 
 fragility_table <- function(result, ...) {
   f_table <- result$get_value('local_data')$f_table_params
-  shiny::validate(shiny::need(!is.null(f_table), message = 'No valid fragility matrices detected!'))
+  shiny::validate(shiny::need(!is.null(f_table), message = 'No fragility map currently loaded!'))
   f_table
 }
 
@@ -36,7 +36,7 @@ fragility_table <- function(result, ...) {
 
 fragility_map <- function(result, ...) {
   f <- result$get_value('local_data')$f_plot_params
-  shiny::validate(shiny::need(!is.null(f), message = 'No valid fragility matrices detected! Please follow the steps on the left to generate one.'))
+  shiny::validate(shiny::need(!is.null(f), message = 'No fragility map currently loaded! Please follow the steps on the left.'))
   
   y=f$y
   yi = seq_along(y)
