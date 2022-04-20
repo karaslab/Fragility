@@ -4,14 +4,23 @@ session = getDefaultReactiveDomain()
 static_data = dipsaus::fastmap2()
 
 local_data = reactiveValues(
+  subject_dir = module_tools$get_subject_dirs(),
+  # module_data = module_tools$get_subject_dirs()$module_data_dir,
+  # subject_code = subject$subject_code,
+  # trial = module_tools$get_meta('trials'),
+  # srate <- module_tools$get_sample_rate(original = TRUE),
   v = NULL,
   check = NULL,
   pt_info = NULL,
   adj_info = NULL,
+  f_info = NULL,
+  requested_electrodes = NULL,
   brain_f = NULL,
   J = NULL,
   estimate = NULL,
   Hsize = NULL,
+  f_plot_params = NULL,
+  f_table_params = NULL,
   selected = list(
     adj = '',
     f = ''
@@ -37,10 +46,10 @@ observeEvent(
 observeEvent(
   input$gen_adj, {
     if (local_data$check$pt) {
-      showNotification('Calculating estimated time...', id = 'loadingModal')
+      showNotification('Calculating estimated time...', id = 'loading_modal')
       # Show estimated adj array calculation time
       local_data$est <- estimate_time(local_data$pt_info, as.numeric(requested_tstep), requested_twindow)
-      removeNotification(id = 'loadingModal')
+      removeNotification(id = 'loading_modal')
       showModal(modalDialog(
         title = 'Confirmation',
         easyClose = F,
@@ -93,12 +102,12 @@ observeEvent(
     if (local_data$check$pt) {
       if (local_data$check$adj[tnum_adj]) {
         print('gen_f button clicked')
-        f_info <- generate_fragility_matrix(
-          A = adj_info$A,
-          elec = attr(pt_info$v, "dimnames")$Electrode
+        local_data$f_info <- generate_fragility_matrix(
+          A = local_data$adj_info$A,
+          elec = attr(local_data$pt_info$v, "dimnames")$Electrode
         )
-        f_info <- append(f_info, list(trial = tnum_adj))
-        saveRDS(f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
+        local_data$f_info <- append(local_data$f_info, list(trial = tnum_adj))
+        saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
         local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
         updateSelectInput(session = session, inputId = 'requested_conditions',
                           choices = module_tools$get_meta('trials')$Condition[local_data$check$f],
@@ -114,31 +123,154 @@ observeEvent(
 
 observeEvent(
   input$adj_conditions, {
-    t <- trial$Trial[trial$Condition %in% input$adj_conditions]
-    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
-    if (local_data$check$adj[t]) {
-      if (is.null(local_data$adj_info)) {
-        # if the file exists but hasn't been loaded in yet
-        local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
-      } else if (local_data$adj_info$trial != t) {
-        # if the user requests adj_info for a different trial
-        local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
+    if (!is.null(input$adj_conditions)) {
+      print('updating adj conditions')
+      
+      t <- trial$Trial[trial$Condition %in% input$adj_conditions]
+      local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+      if (local_data$check$adj[t]) {
+        if (is.null(local_data$adj_info)) {
+          # if the file exists but hasn't been loaded in yet
+          local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
+        } else if (local_data$adj_info$trial != t) {
+          # if the user requests adj_info for a different trial
+          local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
+        }
+        # save currently selected trial for "Currently Loaded Trials" display
+        local_data$selected$adj <- local_data$adj_info$trial
       }
-      # save currently selected trial for "Currently Loaded Trials" display
-      local_data$selected$adj <- local_data$adj_info$trial
+      updateActionButton(session = session, inputId = 'gen_adj', 
+                         label = paste0('Generate Adjacency Array for ', input$adj_conditions))
+      updateActionButton(session = session, inputId = 'gen_f', 
+                         label = paste0('Generate Fragility Matrix for ', input$adj_conditions))
     }
-    updateActionButton(session = session, inputId = 'gen_adj', 
-                       label = paste0('Generate Adjacency Array for ', input$adj_conditions))
-    updateActionButton(session = session, inputId = 'gen_f', 
-                       label = paste0('Generate Fragility Matrix for ', input$adj_conditions))
   }
 )
 
 observeEvent(
-  input$requested_conditions, {
+  input$text_electrode, {
+    r_elec = dipsaus::parse_svec(input$text_electrode)
     updateNumericInput(session = session, inputId = 'f_list_length', 
-                       max = floor(length(preload_info$electrodes)/2), 
-                       value = floor(length(preload_info$electrodes)/8))
+                       max = floor(length(r_elec)/2), 
+                       value = max(c(floor(length(r_elec)/8), 1)))
+  }
+)
+
+# observeEvent(
+#   input$requested_conditions, {
+#     if (!is.null(local_data$requested_electrodes)) {
+#       print('updating requested conditions')
+#       showNotification('Updating fragility map...', id = 'updating_f')
+#       tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
+#       print(tnum)
+#       # if (length(tnum) > 1) {
+#       #   f_plot <- list(
+#       #     norm = matrix(data = 0, nrow = dim(local_data$adj_info$A)[1], ncol = dim(local_data$adj_info$A)[3]),
+#       #     avg = vector(mode = 'numeric', length = dim(local_data$adj_info$A)[1]),
+#       #     trial = numeric()
+#       #   )
+#       #   for (i in seq_along(tnum)) {
+#       #     f_i <- readRDS(paste0(module_data,'/',subject_code,'_f_info_trial_',tnum[i]))
+#       #     f_plot[1:2] <- mapply(function(x,y) x + y, f_plot[1:2], f_i[2:3])
+#       #     f_plot$trial <- c(f_plot$trial,tnum[i])
+#       #   }
+#       #   f_plot[1:2] <- lapply(f_plot[1:2], function(x) x/length(tnum))
+#       # } else {
+#       #   f <- readRDS(paste0(module_data,'/',subject_code,'_f_info_trial_',tnum))
+#       #   f_plot <- f[2:4]
+#       # }
+#       # 
+#       # f_plot$norm <- f_plot$norm[as.character(local_data$requested_electrodes),]
+#       # f_plot$avg <- f_plot$avg[as.character(local_data$requested_electrodes)]
+#       # local_data$brain_f <- data.frame("Subject"=subject_code,
+#       #                                  "Electrode"=local_data$requested_electrodes,"Time"=0,
+#       #                                  "Avg_Fragility"=f_plot$avg)
+#       # 
+#       # elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
+#       # fsort <- as.numeric(attr(sort(f_plot$avg), "names"))
+#       # 
+#       # if (sort_fmap == 'Electrode') {
+#       #   elec_order <- elecsort
+#       # } else if (sort_fmap == 'Fragility') {
+#       #   elec_order <- fsort
+#       # }
+#       # 
+#       # if (is.vector(f_plot$norm)){
+#       #   elec_order <- local_data$requested_electrodes
+#       #   x <- 1:length(f_plot$norm)
+#       #   m <- t(t(f_plot$norm))
+#       # } else {
+#       #   f_plot$norm <- f_plot$norm[as.character(elec_order),]
+#       #   x <- 1:dim(f_plot$norm)[2]
+#       #   m <- t(f_plot$norm)
+#       # }
+#       # 
+#       # attr(m, 'xlab') = 'Time'
+#       # attr(m, 'ylab') = 'Electrode'
+#       # attr(m, 'zlab') = 'Fragility'
+#       # 
+#       # if (local_data$check$elist) {
+#       #   y <- paste0(local_data$check$elec_list$Label[elec_order], '(', elec_order, ')')
+#       #   f_list <- paste0(local_data$check$elec_list$Label[fsort], '(', fsort, ')')
+#       # } else {
+#       #   y <- elec_order
+#       #   f_list <- fsort
+#       # }
+#       # 
+#       # local_data$f_plot_params <- list(
+#       #   mat = m,
+#       #   x = x,
+#       #   y = y,
+#       #   zlim = c(0,1)
+#       # )
+#       # 
+#       # local_data$f_table_params <- data.frame(
+#       #   # Ranking = 1:f_list_length,
+#       #   Most.Fragile = rev(f_list)[1:f_list_length],
+#       #   Least.Fragile = f_list[1:f_list_length]
+#       # )
+#       # 
+#       # 
+#       # 
+#       # local_data$selected$f <- f_plot$trial
+#       f_outputs <- draw_f_map_table(
+#         tnum = tnum, 
+#         adj_info = local_data$adj_info, 
+#         f_path = paste0(module_data,'/',subject_code,'_f_info_trial_'), 
+#         requested_electrodes = requested_electrodes
+#       )
+#       
+#       local_data$brain_f <- f_outputs$brain_f
+#       local_data$f_plot_params <- f_outputs$f_plot_params
+#       local_data$f_table_params <- f_outputs$f_table_params
+#       local_data$selected$f <- f_outputs$sel
+#       
+#       removeNotification('updating_f')
+#     }
+#   }
+# )
+
+observeEvent(
+  input$draw_f_map, {
+    showNotification('Updating fragility map...', id = 'updating_f')
+    tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
+    f_outputs <- draw_f_map_table(
+      tnum = tnum, 
+      adj_info = local_data$adj_info, 
+      f_path = paste0(module_data,'/',subject_code,'_f_info_trial_'), 
+      subject_code = subject_code,
+      requested_electrodes = local_data$requested_electrodes,
+      sort_fmap = input$sort_fmap,
+      check = local_data$check,
+      f_list_length = input$f_list_length
+    )
+    
+    local_data$brain_f <- f_outputs$brain_f
+    local_data$f_plot_params <- f_outputs$f_plot_params
+    local_data$f_table_params <- f_outputs$f_table_params
+    local_data$selected$f <- f_outputs$sel
+    
+    removeNotification('updating_f')
   }
 )
 
@@ -158,6 +290,8 @@ observeEvent(
 
 observeEvent(
   input$test, {
+    print(module_data)
+    print(subject_code)
     print(str(local_data$pt_info))
   }
 )

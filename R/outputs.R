@@ -6,7 +6,7 @@ current_sel <- function(result, ...){
   if (sel$adj == ''){
     sel$adj <- 'None'
   }
-  if (sel$f == ''){
+  if (all(sel$f == '')){
     sel$f <- 'None'
   } else {
     sel$f <- toString(sel$f)
@@ -20,7 +20,7 @@ possible_sel <- function(result, ...){
 }
 
 fragility_table <- function(result, ...) {
-  f_table <- result$get_value('f_table_params')
+  f_table <- result$get_value('local_data')$f_table_params
   shiny::validate(shiny::need(!is.null(f_table), message = 'No valid fragility matrices detected!'))
   f_table
 }
@@ -35,7 +35,7 @@ fragility_table <- function(result, ...) {
 # }
 
 fragility_map <- function(result, ...) {
-  f <- result$get_value('f_plot_params')
+  f <- result$get_value('local_data')$f_plot_params
   shiny::validate(shiny::need(!is.null(f), message = 'No valid fragility matrices detected! Please follow the steps on the left to generate one.'))
   
   y=f$y

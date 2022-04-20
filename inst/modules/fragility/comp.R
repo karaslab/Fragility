@@ -40,7 +40,7 @@ define_initialization({
     dir.create(module_data)
   }
   subject_code <- subject$subject_code
-  
+
   trial = module_tools$get_meta('trials')
   srate <- module_tools$get_sample_rate(original = TRUE)
   
@@ -48,6 +48,7 @@ define_initialization({
   local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
   
   print('initializing')
+  initialized <- TRUE
 })
 
 load_scripts(
@@ -242,6 +243,10 @@ define_input(
 )
 
 define_input(
+  actionButton(inputId = 'draw_f_map', label='Draw Fragility Map!'),
+)
+
+define_input(
   actionButton(inputId = 'refresh_btn', label='Refresh'),
 )
 
@@ -269,6 +274,7 @@ input_layout <- list(
     'text_electrode',
     'sort_fmap',
     'f_list_length',
+    'draw_f_map',
     'refresh_btn'
   )
 )

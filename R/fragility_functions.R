@@ -340,3 +340,83 @@ find_fragility <- function(node, A_k, N, limit) {
   
   norm(perturb_mat, type = '2')
 }
+
+draw_f_map_table <- function(tnum, adj_info, f_path, subject_code, requested_electrodes, sort_fmap, check, f_list_length) {
+  print(tnum)
+  print(str(adj_info$A))
+  if (length(tnum) > 1) {
+    f_plot <- list(
+      norm = matrix(data = 0, nrow = dim(adj_info$A)[1], ncol = dim(adj_info$A)[3]),
+      avg = vector(mode = 'numeric', length = dim(adj_info$A)[1]),
+      trial = numeric()
+    )
+    for (i in seq_along(tnum)) {
+      f_i <- readRDS(paste0(f_path,tnum[i]))
+      f_plot[1:2] <- mapply(function(x,y) x + y, f_plot[1:2], f_i[2:3])
+      f_plot$trial <- c(f_plot$trial,tnum[i])
+    }
+    f_plot[1:2] <- lapply(f_plot[1:2], function(x) x/length(tnum))
+  } else {
+    f <- readRDS(paste0(f_path,tnum))
+    f_plot <- f[2:4]
+  }
+  
+  f_plot$norm <- f_plot$norm[as.character(requested_electrodes),]
+  f_plot$avg <- f_plot$avg[as.character(requested_electrodes)]
+  brain_f <- data.frame("Subject"=subject_code,
+                        "Electrode"=requested_electrodes,"Time"=0,
+                        "Avg_Fragility"=f_plot$avg)
+  
+  elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
+  fsort <- as.numeric(attr(sort(f_plot$avg), "names"))
+  
+  if (sort_fmap == 'Electrode') {
+    elec_order <- elecsort
+  } else if (sort_fmap == 'Fragility') {
+    elec_order <- fsort
+  }
+  
+  if (is.vector(f_plot$norm)){
+    elec_order <- requested_electrodes
+    x <- 1:length(f_plot$norm)
+    m <- t(t(f_plot$norm))
+  } else {
+    f_plot$norm <- f_plot$norm[as.character(elec_order),]
+    x <- 1:dim(f_plot$norm)[2]
+    m <- t(f_plot$norm)
+  }
+  
+  attr(m, 'xlab') = 'Time'
+  attr(m, 'ylab') = 'Electrode'
+  attr(m, 'zlab') = 'Fragility'
+  
+  if (check$elist) {
+    y <- paste0(check$elec_list$Label[elec_order], '(', elec_order, ')')
+    f_list <- paste0(check$elec_list$Label[fsort], '(', fsort, ')')
+  } else {
+    y <- elec_order
+    f_list <- fsort
+  }
+  
+  f_plot_params <- list(
+    mat = m,
+    x = x,
+    y = y,
+    zlim = c(0,1)
+  )
+  
+  f_table_params <- data.frame(
+    # Ranking = 1:f_list_length,
+    Most.Fragile = rev(f_list)[1:f_list_length],
+    Least.Fragile = f_list[1:f_list_length]
+  )
+  
+  sel <- f_plot$trial
+  
+  output <- list(
+    brain_f = brain_f,
+    f_plot_params = f_plot_params,
+    f_table_params = f_table_params,
+    sel = sel
+  )
+}
