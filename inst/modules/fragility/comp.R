@@ -52,6 +52,8 @@ define_initialization({
   
   # check if subject has pt_info, adj_info, and f_info files
   local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+  
+  new_subject <- TRUE
 })
 
 load_scripts(

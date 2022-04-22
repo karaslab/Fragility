@@ -47,13 +47,14 @@ if (local_data$check$pt && is.null(isolate(local_data$pt_info))) {
 }
 
 # initialize adj_info if available
-if (any(local_data$check$adj) && is.null(isolate(local_data$adj_info))) {
+if (any(local_data$check$adj) & (is.null(isolate(local_data$adj_info)) | new_subject)) {
   print('Loading adj_info first time')
   showNotification('Loading existing adjacency array...', id = 'adj_loading')
   tnum_adj <- which(local_data$check$adj)[1]
   local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
   local_data$selected$adj <- local_data$adj_info$trial
   removeNotification('adj_loading')
+  new_subject <- FALSE
 } else {
   # if already initialized, update tnum_adj to reflect user selection
   tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]

@@ -180,8 +180,7 @@ observeEvent(
     input$text_electrode,
     input$sort_fmap,
     input$f_list_length,
-    input$sz_onset,
-    input$exponentiate
+    input$sz_onset
   ), {
     if (shiny::isTruthy(input$auto_calc) & !is.null(local_data$requested_electrodes)) {
       local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
@@ -193,7 +192,7 @@ observeEvent(
         tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
         f_outputs <- draw_f_map_table(
           tnum = tnum, 
-          adj_info = local_data$adj_info, 
+          adj_info = local_data$adj_info,
           f_path = paste0(module_data,'/',subject_code,'_f_info_trial_'), 
           subject_code = subject_code,
           requested_electrodes = local_data$requested_electrodes,
@@ -202,9 +201,6 @@ observeEvent(
           f_list_length = input$f_list_length
         )
         
-        f_outputs$brain_f$Avg_Fragility <- f_outputs$brain_f$Avg_Fragility^input$exponentiate
-        # f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
-        
         local_data$brain_f <- f_outputs$brain_f
         local_data$f_plot_params <- f_outputs$f_plot_params
         local_data$f_table_params <- f_outputs$f_table_params
@@ -212,6 +208,10 @@ observeEvent(
         
         local_data$J <- length(f_outputs$f_plot_params$x)
         local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset))
+        
+        local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
+        # f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
+        rebuild_3d_viewer()
         
         removeNotification('updating_f')
       } else {
@@ -226,15 +226,15 @@ observeEvent(
 
 observeEvent(
   input$draw_f_map, {
-    showNotification('Updating fragility map...', id = 'updating_f')
     local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
     if (!all(local_data$requested_electrodes %in% preload_info$electrodes)) {
       stop('Please only select loaded electrodes.')
     }
+    showNotification('Updating fragility map...', id = 'updating_f')
     tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
     f_outputs <- draw_f_map_table(
       tnum = tnum, 
-      adj_info = local_data$adj_info, 
+      adj_info = local_data$adj_info,
       f_path = paste0(module_data,'/',subject_code,'_f_info_trial_'), 
       subject_code = subject_code,
       requested_electrodes = local_data$requested_electrodes,
@@ -243,19 +243,28 @@ observeEvent(
       f_list_length = input$f_list_length
     )
     
-    f_outputs$brain_f$Avg_Fragility <- f_outputs$brain_f$Avg_Fragility^input$exponentiate
-    # f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
-    
-    local_data$J <- length(f_outputs$f_plot_params$x)
-    
     local_data$brain_f <- f_outputs$brain_f
     local_data$f_plot_params <- f_outputs$f_plot_params
     local_data$f_table_params <- f_outputs$f_table_params
     local_data$selected$f <- f_outputs$sel
     
+    local_data$J <- length(f_outputs$f_plot_params$x)
     local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset))
     
+    local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
+    # f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
+    rebuild_3d_viewer()
+    
     removeNotification('updating_f')
+  }
+)
+
+observeEvent(
+  input$exponentiate, {
+    if (shiny::isTruthy(local_data$brain_f)) {
+      local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
+      rebuild_3d_viewer()
+    }
   }
 )
 
@@ -278,15 +287,14 @@ observeEvent(
   }
 )
 
-observeEvent(
-  input$test, {
-    print(module_data)
-    print(subject_code)
-    print(str(local_data$pt_info))
-  }
-)
+# observeEvent(
+#   input$test, {
+#     local_data$brain_f$Avg_Fragility <- local_data$brain_f$Avg_Fragility^input$exponentiate
+#     rebuild_3d_viewer()
+#   }
+# )
 
-power_3d_fun = function(need_calc, side_width, daemon_env, viewer_proxy, ...){
+power_3d_fun <- function(need_calc, side_width, daemon_env, viewer_proxy, ...){
   showNotification(p('Rebuild 3d viewer...'), id='power_3d_fun')
   brain <- rave::rave_brain2(subject = subject)
   
@@ -314,7 +322,7 @@ power_3d_fun = function(need_calc, side_width, daemon_env, viewer_proxy, ...){
   # }
   
   if( need_calc ){
-    values = isolate(local_data$brain_f)
+    values = local_data$brain_f_plot
     
     # values = localdata.frame("Subject"=subject$subject_code,"Electrode"=requested_electrodes,"Time"=0,"Avg_Fragility"=local_data$avg_fragility)
     # values$Subject = as.factor(subject$subject_code)
@@ -399,3 +407,11 @@ power_3d_fun = function(need_calc, side_width, daemon_env, viewer_proxy, ...){
   re
 }
 
+rebuild_3d_viewer <- function() {
+  if(rave::rave_context()$context %in% c('rave_running', 'default')) {
+    dipsaus::cat2("Updating 3D viewer from r3dv")
+    btn_val = (input[['power_3d_btn']]) - 0.001
+    dipsaus::set_shiny_input(session = session, inputId = 'power_3d_btn',
+                             value = btn_val, method = 'proxy', priority = 'event')
+  }
+}

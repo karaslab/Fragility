@@ -20,7 +20,8 @@ Imports:
     raveio (>= 0.0.5),
     dipsaus (>= 0.0.2),
     glmnet (>= 4.1.3),
-    doMC (>= 1.3.8)
+    doMC (>= 1.3.8),
+    dplyr (>= 1.0.7)
 Suggests:
     rstudioapi (>= 0.9.0),
     knitr,
