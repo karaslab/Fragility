@@ -16,7 +16,13 @@ current_sel <- function(result, ...){
 
 possible_sel <- function(result, ...){
   pos <- lapply(result$get_value('possible'), toString)
-  paste0('Pt Processed? ', pos$pt, ' | Adjacency Array: ', pos$adj, ' | Fragility Map: ', pos$f)
+  if (all(pos$adj == '')){
+    pos$adj <- 'None'
+  }
+  if (all(pos$f == '')){
+    pos$f <- 'None'
+  }
+  paste0('Pt. Processed? ', pos$pt, ' | Adj. Array: ', pos$adj, ' | Frag. Map: ', pos$f)
 }
 
 fragility_table <- function(result, ...) {
@@ -24,15 +30,6 @@ fragility_table <- function(result, ...) {
   shiny::validate(shiny::need(!is.null(f_table), message = 'No fragility map currently loaded!'))
   f_table
 }
-
-# least_fragile <- function(result, ...) {
-#   f_text <- result$get_value('f_text_params')
-#   if(is.null(f_text)) {
-#     return('No valid fragility matrices detected! Please follow the steps on the left to generate one.')
-#   } else {
-#     paste0(f_text$num, ' least fragile electrodes: ', paste0(f_text$least, collapse = ', '))
-#   }
-# }
 
 fragility_map <- function(result, ...) {
   f <- result$get_value('local_data')$f_plot_params
@@ -46,10 +43,6 @@ fragility_map <- function(result, ...) {
     yi = .seq
   }
   
-  # print(str(f$mat))
-  # print(str(f$x))
-  # print(str(f$y))
-  
   ravebuiltins:::draw_many_heat_maps(list(
     list(
       data = f$mat,
@@ -59,7 +52,7 @@ fragility_map <- function(result, ...) {
       range = 0:1
     )
   ), axes = c(TRUE,FALSE), PANEL.LAST = ravebuiltins:::add_decorator(function(...) {
-    
+    abline(v = f$sz_onset, lty = 2, lwd = 2)
     mtext(y, side=2, line=-1, at=yi, cex=(ravebuiltins:::rave_cex.lab*0.8), las=1)
   }, ravebuiltins:::spectrogram_heatmap_decorator())
   )

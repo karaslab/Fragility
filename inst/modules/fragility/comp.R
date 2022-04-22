@@ -29,25 +29,29 @@ mount_demo_subject()
 
 define_initialization({
   # Enter code to handle data when a new subject is loaded
+  print('initializing')
   
+  # load voltage data
   rave_checks('voltage referenced')
   volt <- module_tools$get_voltage()
   local_data$v <- volt$get_data()
   
+  # get necessary directories and subject data for file storage
   subject_dir <- module_tools$get_subject_dirs()
   module_data <- subject_dir$module_data_dir
+  
+  # if module_data directory doesn't exist yet, create it
   if (!file.exists(module_data)){
     dir.create(module_data)
   }
-  subject_code <- subject$subject_code
 
-  trial = module_tools$get_meta('trials')
+  # get various subject metadata
+  subject_code <- subject$subject_code
+  trial <- module_tools$get_meta('trials')
   srate <- module_tools$get_sample_rate(original = TRUE)
   
   # check if subject has pt_info, adj_info, and f_info files
   local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
-  
-  print('initializing')
 })
 
 load_scripts(
@@ -96,7 +100,7 @@ load_scripts(
 #' indicating the label of this input will update according to actual data.
 #'
 #' You may also change multiple arguments. The following code is an extended example
-#'
+
 define_input(
   definition = textInput(inputId = 'text_electrode', label = 'Electrode'),
 
@@ -135,16 +139,15 @@ define_input(
 )
 
 define_input(
+  definition = checkboxInput(inputId = 'half_hz', label='Halve Frequency?'),
+)
+
+define_input(
   selectInput(inputId = 'adj_conditions', choices = character(0), label='Seizure Trial for Matrix Generation'),
 
   init_args = c('choices', 'selected'),
 
   init_expr = {
-    print('initializing adj_conditions')
-    # the module_tools object allows access to the meta data, including the "trial label" variable called Condition
-    # The trial numbers and condition labels, are in the epoch file
-    # rstudioapi::navigateToFile(file.path(rave::rave_options('data_dir'), 'demo','DemoSubject','rave', 'meta','epoch_auditory_onset.csv'))
-
     choices = unique(module_tools$get_meta('trials')$Condition)
     selected = module_tools$get_meta('trials')$Condition[1]
   }
@@ -156,19 +159,17 @@ define_input(
   init_args = c('label','choices', 'selected'),
 
   init_expr = {
-    print('initializing requested_conditions')
     if (any(local_data$check$f)){
+      # allow user to choose between trials that have available f_info files
       label = 'Seizure Trial(s) for Fragility Map Display'
       choices = module_tools$get_meta('trials')$Condition[local_data$check$f]
       selected = module_tools$get_meta('trials')$Condition[local_data$check$f][1]
     } else {
+      # if there are no available f_info files
       label = 'No valid fragility matrices detected! Please generate one above.'
       choices = character(0)
       selected = NULL
     }
-
-    # choices = module_tools$get_meta('trials')$Condition
-    # selected = module_tools$get_meta('trials')$Condition[1]
   }
 )
 
@@ -197,12 +198,6 @@ define_input(
 
 define_input(
   numericInput(inputId = 'requested_nlambda', label='Number of Lambdas', min=1, max=100, value=16, step=1),
-
-  # init_args = 'value',
-  #
-  # init_expr = {
-  #   value =
-  # }
 )
 
 define_input(
@@ -227,6 +222,21 @@ define_input(
     max = floor(length(preload_info$electrodes)/2)
     value = min(c(floor(length(preload_info$electrodes)/8), 10))
   }
+)
+
+define_input(
+  sliderInput(inputId = 'sz_onset', label='Seizure Onset Marker', min=1, max=1, value=1, step=1),
+  
+  init_args = c('max','value'),
+  
+  init_expr = {
+    max = local_data$J
+    value = trunc(local_data$J/2)
+  }
+)
+
+define_input(
+  sliderInput(inputId = 'exponentiate', label='Exponentiate Fragility (for higher contrast on 3D brain)', min=1, max=5, value=1, step=2, ticks = FALSE)
 )
 
 define_input(
@@ -273,6 +283,7 @@ define_input(
 input_layout <- list(
   '[-]Step 1: Process Patient' = list(
     'recording_unit',
+    'half_hz',
     'process_pt'
   ),
   '[-]Step 2: Adjacency Array' = list(
@@ -288,7 +299,9 @@ input_layout <- list(
     'requested_conditions',
     'text_electrode',
     'sort_fmap',
+    'sz_onset',
     'f_list_length',
+    'exponentiate',
     'auto_calc',
     'draw_f_map'
   ),
@@ -357,11 +370,9 @@ define_output(
   definition = tableOutput('fragility_table'),
   title = 'Most/Least Fragile Electrodes',
   width = 3,
-  #tags$style(type='text/css', '#most_fragile {white-space: pre-wrap;}'),
   order = 4
 )
 
-#for some reason this makes main execute an additional time
 define_output_3d_viewer(
   outputId = 'power_3d',
   message = 'Click here to reload viewer',
