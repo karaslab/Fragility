@@ -32,9 +32,9 @@ define_initialization({
   print('initializing')
   
   # load voltage data
-  rave_checks('voltage referenced')
-  volt <- module_tools$get_voltage()
-  local_data$v <- volt$get_data()
+  # rave_checks('voltage referenced')
+  # volt <- module_tools$get_voltage()
+  # local_data$v <- volt$get_data()
   
   # get necessary directories and subject data for file storage
   subject_dir <- module_tools$get_subject_dirs()
@@ -238,7 +238,11 @@ define_input(
 )
 
 define_input(
-  sliderInput(inputId = 'exponentiate', label='Exponentiate Fragility (for higher contrast on 3D brain)', min=1, max=5, value=1, step=2, ticks = FALSE)
+  sliderInput(inputId = 'exponentiate', label='Exponentiate 3D Viewer Fragility (for higher contrast)', min=1, max=5, value=1, step=2, ticks = FALSE)
+)
+
+define_input(
+  checkboxInput(inputId = 'exp_fmap', label = 'Exponentiate Fragility Map too?')
 )
 
 define_input(
@@ -304,6 +308,7 @@ input_layout <- list(
     'sz_onset',
     'f_list_length',
     'exponentiate',
+    'exp_fmap',
     'auto_calc',
     'draw_f_map'
   ),

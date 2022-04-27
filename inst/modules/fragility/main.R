@@ -93,14 +93,14 @@ rave::rave_prepare(
   reference = 'car'
 )
 
-# rave::rave_prepare(
-#   subject = 'OnsetZone/KAA',
-#   electrodes =  c(1:116,129:244),
-#   epoch = 'KAA_sz',
-#   time_range = c(20,20),
-#   data_types = 'voltage',
-#   reference = 'car'
-# )
+rave::rave_prepare(
+  subject = 'OnsetZone/KAA',
+  electrodes =  c(1:43,45:80,82:116,129:164,166:184,186:223,226:235,237:244),
+  epoch = 'KAA_sz',
+  time_range = c(20,20),
+  data_types = 'voltage',
+  reference = 'car'
+)
 
 view_layout('fragility')
 

@@ -30,6 +30,9 @@ observeEvent(
     print('process_pt button clicked')
     showNotification('Pre-processing patient...', id = 'pt_processing')
     
+    volt <- module_tools$get_voltage()
+    local_data$v <- volt$get_data()
+    
     # get processed pt_info
     local_data$pt_info <- process_fragility_patient(
       v = local_data$v,
@@ -179,6 +182,7 @@ observeEvent(
     input$requested_conditions,
     input$text_electrode,
     input$sort_fmap,
+    input$exp_fmap,
     input$f_list_length,
     input$sz_onset
   ), {
@@ -201,6 +205,10 @@ observeEvent(
           f_list_length = input$f_list_length
         )
         
+        if (input$exp_fmap){
+          f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
+        }
+        
         local_data$brain_f <- f_outputs$brain_f
         local_data$f_plot_params <- f_outputs$f_plot_params
         local_data$f_table_params <- f_outputs$f_table_params
@@ -210,7 +218,6 @@ observeEvent(
         local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset))
         
         local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
-        # f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
         rebuild_3d_viewer()
         
         removeNotification('updating_f')
@@ -243,6 +250,10 @@ observeEvent(
       f_list_length = input$f_list_length
     )
     
+    if (input$exp_fmap){
+      f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
+    }
+    
     local_data$brain_f <- f_outputs$brain_f
     local_data$f_plot_params <- f_outputs$f_plot_params
     local_data$f_table_params <- f_outputs$f_table_params
@@ -252,7 +263,6 @@ observeEvent(
     local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset))
     
     local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
-    # f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
     rebuild_3d_viewer()
     
     removeNotification('updating_f')
