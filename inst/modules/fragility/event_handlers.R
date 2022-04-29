@@ -13,6 +13,8 @@ local_data = reactiveValues(
   adj_info = NULL,
   f_info = NULL,
   requested_electrodes = NULL,
+  twindow = NULL,
+  tstep = NULL,
   brain_f = NULL,
   est = NULL,
   J = NULL,
@@ -58,8 +60,18 @@ observeEvent(
     if (local_data$check$pt) {
       showNotification('Calculating estimated time...', id = 'loading_modal')
       
+      # convert requested_tstep and twindow from ms to # of datapoints within that timewindow using Hz
+      local_data$twindow <- 2 * round(input$requested_twindow * local_data$pt_info$srate / 2000) # twindow needs to be even number
+      if (as.numeric(input$requested_tstep) == input$requested_twindow) {
+        local_data$tstep <- local_data$twindow
+      } else if (as.numeric(requested_tstep)*2 == requested_twindow) {
+        local_data$tstep <- local_data$twindow/2
+      } else {
+        stop('Time step should always be equal to or half of time window')
+      }
+      
       # calculate estimated time (currently working on this feature)
-      local_data$est <- estimate_time(local_data$pt_info, as.numeric(requested_tstep), requested_twindow)
+      local_data$est <- estimate_time(local_data$pt_info, local_data$tstep, local_data$twindow)
       
       removeNotification(id = 'loading_modal')
       
@@ -101,8 +113,8 @@ observeEvent(
     
     # get adj_info
     local_data$adj_info <- generate_adj_array(
-      t_window = input$requested_twindow,
-      t_step = as.numeric(input$requested_tstep),
+      t_window = local_data$twindow,
+      t_step = local_data$tstep,
       v = local_data$pt_info$v,
       trial_num = tnum_adj,
       nlambda = input$requested_nlambda,

@@ -141,7 +141,7 @@ define_input(
 )
 
 define_input(
-  definition = checkboxInput(inputId = 'half_hz', label='Halve Frequency?'),
+  definition = checkboxInput(inputId = 'half_hz', label='Halve Sampling Rate?'),
 )
 
 define_input(
@@ -156,7 +156,7 @@ define_input(
 )
 
 define_input(
-  selectInput(inputId = 'requested_conditions', choices = character(0), multiple = TRUE, label='Seizure Trial(s) for Fragility Map Display'),
+  selectInput(inputId = 'requested_conditions', choices = character(0), multiple = TRUE, label='Seizure Trial(s) for Fragility Display'),
 
   init_args = c('label','choices', 'selected'),
 
@@ -176,7 +176,7 @@ define_input(
 )
 
 define_input(
-  sliderInput(inputId = 'requested_twindow', label='Time Window Size', min=100, max=1000, value=250, step=50, ticks = FALSE),
+  sliderInput(inputId = 'requested_twindow', label='Time Window Size (ms)', min=100, max=1000, value=250, step=10, ticks = FALSE),
 
   # could code in something to auto calculate timewindow using # of time points and sample rate?
   # init_args = c('min', 'max', 'value', 'step'),
@@ -188,7 +188,7 @@ define_input(
 )
 
 define_input(
-  selectInput(inputId = 'requested_tstep', label='Time Step', choices = character(0)),
+  selectInput(inputId = 'requested_tstep', label='Time Step (ms)', choices = character(0)),
 
   init_args = c('choices', 'selected'),
 
@@ -301,7 +301,7 @@ input_layout <- list(
     'gen_adj',
     'gen_f'
   ),
-  '[-]Step 3: Fragility Map' = list(
+  '[-]Step 3: View Fragility' = list(
     'requested_conditions',
     'text_electrode',
     'sort_fmap',
