@@ -109,6 +109,7 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
   doMC::registerDoMC(cores = ncores)
   
   adjprogress = rave::progress(title = 'Generating Adjacency Array', max = J)
+  shiny::showNotification('Calculating estimated time remaining...', id = 'first_est', duration = NULL)
   for (k in 1:J) {
     start_time <- Sys.time()
     print(paste0('Current timewindow: ', k, ' out of ', J))
@@ -123,7 +124,16 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
     
     end_time <- Sys.time()
     print(end_time - start_time)
+    
+    if (k == 1) {
+      shiny::removeNotification(id = 'first_est')
+      t_avg <- 0
+    }
+
+    t_avg <- (t_avg*(k-1) + as.numeric(difftime(end_time, start_time, units='mins')))/k
+    shiny::showNotification(paste0('Estimated time remaining: ', (t_avg*(J-k))%/%60, ' hours, ', round((t_avg*(J-k))%%60, digits = 1), ' minutes'), id = 'est_time', duration = NULL)
   }
+  shiny::removeNotification(id = 'est_time')
   
   adjprogress$close()
   

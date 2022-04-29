@@ -30,7 +30,7 @@ local_data = reactiveValues(
 observeEvent(
   input$process_pt, {
     print('process_pt button clicked')
-    showNotification('Pre-processing patient...', id = 'pt_processing')
+    showNotification('Pre-processing patient...', id = 'pt_processing', duration = NULL)
     
     volt <- module_tools$get_voltage()
     local_data$v <- volt$get_data()
@@ -58,7 +58,7 @@ observeEvent(
     local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     
     if (local_data$check$pt) {
-      showNotification('Calculating estimated time...', id = 'loading_modal')
+      showNotification('Estimating required futures.globals.maxSize...', id = 'loading_modal', duration = NULL)
       
       # convert requested_tstep and twindow from ms to # of datapoints within that timewindow using Hz
       local_data$twindow <- 2 * round(input$requested_twindow * local_data$pt_info$srate / 2000) # twindow needs to be even number
@@ -89,7 +89,7 @@ observeEvent(
           tags$blockquote(paste0(local_data$est$J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
           p('Required futures.globals.maxSize: '),
           tags$blockquote(format(local_data$est$Hsize, units = 'MB')),
-          p('This might take a while.')
+          p('This might take a while. Estimated time remaining will appear after first time window is calculated.')
           # hr(),
           # local_data$est$time
         ))
@@ -204,7 +204,7 @@ observeEvent(
         stop('Please only select loaded electrodes.')
       }
       if (!is.null(input$requested_conditions)) {
-        showNotification('Updating fragility map...', id = 'updating_f')
+        showNotification('Updating fragility map...', id = 'updating_f', duration = NULL)
         tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
         f_outputs <- draw_f_map_table(
           tnum = tnum, 
@@ -249,7 +249,7 @@ observeEvent(
     if (!all(local_data$requested_electrodes %in% preload_info$electrodes)) {
       stop('Please only select loaded electrodes.')
     }
-    showNotification('Updating fragility map...', id = 'updating_f')
+    showNotification('Updating fragility map...', id = 'updating_f', duration = NULL)
     tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
     f_outputs <- draw_f_map_table(
       tnum = tnum, 
@@ -292,7 +292,7 @@ observeEvent(
 
 observeEvent(
   input$refresh_btn, {
-    showNotification('Re-reading patient info...', id = 'refreshing')
+    showNotification('Re-reading patient info...', id = 'refreshing', duration = NULL)
     local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     if (local_data$check$pt) {
       local_data$pt_info <- readRDS(paste0(module_data,'/',subject_code,'_pt_info'))
