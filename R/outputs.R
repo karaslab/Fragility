@@ -57,3 +57,25 @@ fragility_map <- function(result, ...) {
   }, ravebuiltins:::spectrogram_heatmap_decorator())
   )
 }
+
+voltage_trace <- function(result, ...) {
+  vmat_params <- result$get_value('local_data')$vmat_params
+  shiny::validate(shiny::need(!is.null(vmat_params), message = 'Load the original EEG data with the button on the left.'))
+  
+  # compress by factor of 4 to save plotting time
+  vmat <- vmat_params$mat[seq(1,nrow(vmat_params$mat),4),]
+
+  t <- dim(vmat)[1]*4
+  N <- dim(vmat)[2]
+  z <- (vmat - mean(vmat)) / sd(vmat)
+
+  par(mar=c(3,6,0,0))
+  rutabaga::plot_clean(as.numeric(attr(vmat, "dimnames")$Time), -3:N*3)
+  axis(1)
+  abline(h=0:(N-1)*3, col = "skyblue")
+  for(ii in 1:ncol(vmat)) {
+    lines(x = attr(vmat, "dimnames")$Time, y = z[,ii]+(ii-1)*3)
+  }
+
+  axis(2, at=0:(N-1)*3, vmat_params$elec_labels, las=1, tcl=0)
+}

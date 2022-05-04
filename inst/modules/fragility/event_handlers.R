@@ -13,11 +13,14 @@ local_data = reactiveValues(
   adj_info = NULL,
   f_info = NULL,
   requested_electrodes = NULL,
+  v_electrodes = NULL,
   twindow = NULL,
   tstep = NULL,
   brain_f = NULL,
   est = NULL,
   J = NULL,
+  v_loaded = NULL,
+  vmat_params = NULL,
   f_plot_params = NULL,
   f_table_params = NULL,
   selected = list(
@@ -32,8 +35,8 @@ observeEvent(
     print('process_pt button clicked')
     showNotification('Pre-processing patient...', id = 'pt_processing', duration = NULL)
     
-    volt <- module_tools$get_voltage()
-    local_data$v <- volt$get_data()
+    # volt <- module_tools$get_voltage()
+    # local_data$v <- volt$get_data()
     
     # get processed pt_info
     local_data$pt_info <- process_fragility_patient(
@@ -182,27 +185,70 @@ observeEvent(
 
 observeEvent(
   input$text_electrode, {
-    local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
-    updateNumericInput(session = session, inputId = 'f_list_length', 
-                       max = floor(length(local_data$requested_electrodes)/2), 
-                       value = max(c(min(c(floor(length(local_data$requested_electrodes)/2), 10)), 1)))
+    local_data$requested_electrodes <- dipsaus::parse_svec(input$text_electrode)
+    if (shiny::isTruthy(input$auto_calc) & !is.null(local_data$requested_electrodes)) {
+      if (!all(local_data$requested_electrodes %in% preload_info$electrodes)) {
+        stop('Please only select loaded electrodes.')
+      }
+      
+      if (input$v_sync) {
+        updateTextInput(session = session, inputId = 'v_electrode', value = input$text_electrode)
+      }
+      
+      updateNumericInput(session = session, inputId = 'f_list_length', 
+                         max = floor(length(local_data$requested_electrodes)/2), 
+                         value = max(c(min(c(floor(length(local_data$requested_electrodes)/2), 10)), 1)))
+      
+      if (!is.null(input$requested_conditions)) {
+        showNotification('Updating fragility map...', id = 'updating_f', duration = NULL)
+        tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
+        f_outputs <- draw_f_map_table(
+          tnum = tnum, 
+          adj_info = local_data$adj_info,
+          f_path = paste0(module_data,'/',subject_code,'_f_info_trial_'), 
+          subject_code = subject_code,
+          requested_electrodes = local_data$requested_electrodes,
+          sort_fmap = input$sort_fmap,
+          check = local_data$check,
+          f_list_length = input$f_list_length
+        )
+        
+        if (input$exp_fmap){
+          f_outputs$f_plot_params$mat <- f_outputs$f_plot_params$mat^input$exponentiate
+        }
+        
+        local_data$brain_f <- f_outputs$brain_f
+        local_data$f_plot_params <- f_outputs$f_plot_params
+        local_data$f_table_params <- f_outputs$f_table_params
+        local_data$selected$f <- f_outputs$sel
+        
+        local_data$J <- length(f_outputs$f_plot_params$x)
+        local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset))
+        
+        local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
+        rebuild_3d_viewer()
+        
+        removeNotification('updating_f')
+      } else {
+        local_data$brain_f <- NULL
+        local_data$f_plot_params <- NULL
+        local_data$f_table_params <- NULL
+        local_data$selected$f <- ''
+      }
+    }
   }
 )
 
 observeEvent(
   list(
     input$requested_conditions,
-    input$text_electrode,
     input$sort_fmap,
     input$exp_fmap,
     input$f_list_length,
     input$sz_onset
   ), {
+    local_data$requested_electrodes <- dipsaus::parse_svec(input$text_electrode)
     if (shiny::isTruthy(input$auto_calc) & !is.null(local_data$requested_electrodes)) {
-      local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
-      if (!all(local_data$requested_electrodes %in% preload_info$electrodes)) {
-        stop('Please only select loaded electrodes.')
-      }
       if (!is.null(input$requested_conditions)) {
         showNotification('Updating fragility map...', id = 'updating_f', duration = NULL)
         tnum <- trial$Trial[trial$Condition %in% input$requested_conditions]
@@ -245,7 +291,7 @@ observeEvent(
 
 observeEvent(
   input$draw_f_map, {
-    local_data$requested_electrodes = dipsaus::parse_svec(text_electrode)
+    local_data$requested_electrodes <- dipsaus::parse_svec(input$text_electrode)
     if (!all(local_data$requested_electrodes %in% preload_info$electrodes)) {
       stop('Please only select loaded electrodes.')
     }
@@ -286,6 +332,58 @@ observeEvent(
     if (shiny::isTruthy(local_data$brain_f)) {
       local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
       rebuild_3d_viewer()
+    }
+  }
+)
+
+observeEvent(
+  input$load_v_traces, {
+    t <- trial$Trial[trial$Condition %in% input$v_conditions]
+    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
+    if (!all(local_data$voltage_electrodes %in% preload_info$electrodes)) {
+      stop('Please only select loaded electrodes.')
+    }
+    if (local_data$check$elist) {
+      elec_labels <- paste0(local_data$check$elec_list$Label[local_data$voltage_electrodes], '(', local_data$voltage_electrodes, ')')
+    } else {
+      elec_labels <- local_data$voltage_electrodes
+    }
+    local_data$vmat_params <- list(
+      mat = local_data$v[t,,as.character(local_data$voltage_electrodes)],
+      elec_labels = elec_labels
+    )
+    local_data$v_loaded <- TRUE
+  }
+)
+
+observeEvent(
+  list(
+    input$v_conditions,
+    input$v_electrode,
+    input$v_sync
+  ), {
+    if (exists('trial') & shiny::isTruthy(local_data$v_loaded)) {
+      t <- trial$Trial[trial$Condition %in% input$v_conditions]
+      local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+      if (input$v_sync){
+        updateTextInput(session = session, inputId = 'v_electrode', value = input$text_electrode)
+        local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
+      } else {
+        local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
+      }
+      if (!all(local_data$voltage_electrodes %in% preload_info$electrodes)) {
+        stop('Please only select loaded electrodes.')
+      }
+      if (local_data$check$elist) {
+        elec_labels <- paste0(local_data$check$elec_list$Label[local_data$voltage_electrodes], '(', local_data$voltage_electrodes, ')')
+      } else {
+        elec_labels <- local_data$voltage_electrodes
+      }
+      local_data$vmat_params <- list(
+        mat = local_data$v[t,,as.character(local_data$voltage_electrodes)],
+        elec_labels = elec_labels
+      )
     }
   }
 )
@@ -437,3 +535,4 @@ rebuild_3d_viewer <- function() {
                              value = btn_val, method = 'proxy', priority = 'event')
   }
 }
+

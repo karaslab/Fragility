@@ -172,6 +172,7 @@ generate_fragility_matrix <- function(A, elec, lim = 1i) {
   J <- dim(A)[3]
   f_vals <- matrix(nrow = N, ncol = J)
   fprogress = rave::progress(title = 'Generating Fragility Matrix', max = J)
+  shiny::showNotification('Calculating estimated time remaining...', id = 'first_est', duration = NULL)
   for (k in 1:J) {
     start_time <- Sys.time()
     print(paste0('Current timewindow: ', k, ' out of ', J))
@@ -181,7 +182,17 @@ generate_fragility_matrix <- function(A, elec, lim = 1i) {
     }
     end_time <- Sys.time()
     print(end_time - start_time)
+    
+    if (k == 1) {
+      shiny::removeNotification(id = 'first_est')
+      t_avg <- 0
+    }
+    
+    t_avg <- (t_avg*(k-1) + as.numeric(difftime(end_time, start_time, units='sec')))/k
+    shiny::showNotification(paste0('Estimated time remaining: ', (t_avg*(J-k))%/%60, ' minutes'), id = 'est_time', duration = NULL)
+    
   }
+  shiny::removeNotification(id = 'est_time')
   fprogress$close()
   rownames(f_vals) <- elec
   colnames(f_vals) <- 1:J
