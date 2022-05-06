@@ -58,7 +58,7 @@ observeEvent(
   input$gen_adj, {
     
     # re-check what files are available
-    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     
     if (local_data$check$pt) {
       showNotification('Estimating required futures.globals.maxSize...', id = 'loading_modal', duration = NULL)
@@ -137,7 +137,7 @@ observeEvent(
   input$gen_f, {
     
     # re-check what files are available
-    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     
     # show different messages based on what files are available
     if (local_data$check$pt) {
@@ -149,7 +149,7 @@ observeEvent(
         )
         local_data$f_info <- append(local_data$f_info, list(trial = tnum_adj))
         saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
-        local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+        # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
         updateSelectInput(session = session, inputId = 'requested_conditions',
                           choices = module_tools$get_meta('trials')$Condition[local_data$check$f],
                           selected = input$requested_conditions)
@@ -166,7 +166,7 @@ observeEvent(
   input$adj_conditions, {
     if (exists('trial')) {
       t <- trial$Trial[trial$Condition %in% input$adj_conditions]
-      local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+      # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
       if (shiny::isTruthy(local_data$adj_info) & local_data$check$adj[t]) {
         if (local_data$adj_info$trial != t) {
           # if the user requests adj_info for a different trial
@@ -339,7 +339,7 @@ observeEvent(
 observeEvent(
   input$load_v_traces, {
     t <- trial$Trial[trial$Condition %in% input$v_conditions]
-    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
     if (!all(local_data$voltage_electrodes %in% preload_info$electrodes)) {
       stop('Please only select loaded electrodes.')
@@ -365,7 +365,7 @@ observeEvent(
   ), {
     if (exists('trial') & shiny::isTruthy(local_data$v_loaded)) {
       t <- trial$Trial[trial$Condition %in% input$v_conditions]
-      local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+      # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
       if (input$v_sync){
         updateTextInput(session = session, inputId = 'v_electrode', value = input$text_electrode)
         local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)

@@ -33,7 +33,7 @@ rave::rave_prepare(
 print('executing main')
 
 # initalize pt_info if available
-if (local_data$check$pt && is.null(isolate(local_data$pt_info))) {
+if (local_data$check$pt & is.null(isolate(local_data$pt_info)) | new_subject) {
   print('Loading pt_info first time')
   showNotification('Loading existing pre-processed patient...', id = 'pt_loading')
   # load it in if the file exists but hasn't been loaded in yet
@@ -60,6 +60,7 @@ if (any(local_data$check$adj) & (is.null(isolate(local_data$adj_info)) | new_sub
   tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
 }
 
+local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
 # update available trials every recalculate
 possible <- list(
   pt = local_data$check$pt,

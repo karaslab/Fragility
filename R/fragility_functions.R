@@ -114,6 +114,7 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
     start_time <- Sys.time()
     print(paste0('Current timewindow: ', k, ' out of ', J))
     adjprogress$inc(paste0('Current timewindow: ', k, ' out of ', J))
+    
     t_start <- 1+(k-1)*t_step
     svec <- generate_state_vectors(v,trial_num,t_window,t_start)
     A[,,k] <- find_adj_matrix(svec, N, t_window, nlambda = nlambda, ncores = ncores)
@@ -292,9 +293,9 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = TRUE, nlambda = nlambda)
   lambdas <- rev(cv.ridge$lambda)
   
-  test_lambda <- function(l, H, b, lambdas, ncores) {
+  test_lambda <- function(l, H, b) {
     ridge <- glmnet::glmnet(H, b, alpha = 0, lambda = l)
-    N = sqrt(dim(H)[2])
+    N <- sqrt(dim(H)[2])
     adj_matrix <-  matrix(ridge$beta, nrow = N, ncol = N, byrow = TRUE)
     eigv <- abs(eigen(adj_matrix, only.values = TRUE)$values)
     stable <- max(eigv) < 1
@@ -323,7 +324,7 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   }
   
   if (length(stable_i) == 0) {
-    stop('no lambdas make result in stable adjacency matrix')
+    stop('no lambdas result in stable adjacency matrix')
   }
   
   adj_matrix <- results[[stable_i[1]]]$adj

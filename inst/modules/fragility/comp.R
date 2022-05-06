@@ -127,7 +127,7 @@ define_input(
 # Step 2: Generate Model----
 
 define_input(
-  sliderInput(inputId = 'requested_twindow', label='Time Window Size (ms)', min=100, max=1000, value=250, step=10, ticks = FALSE),
+  sliderInput(inputId = 'requested_twindow', label='Time Window Size (ms)', min=100, max=1000, value=100, step=10, ticks = FALSE),
 )
 
 define_input(
@@ -137,7 +137,7 @@ define_input(
   
   init_expr = {
     choices = c(input$requested_twindow, input$requested_twindow/2)
-    selected = input$requested_twindow/2
+    selected = input$requested_twindow
   }
 )
 
