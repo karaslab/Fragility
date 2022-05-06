@@ -50,7 +50,7 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
     start_time <- Sys.time()
     print(paste0('current timewindow: ', k, ' out of ', J))
     t_start <- 1+(k-1)*t_step
-    svec <- generate_state_vectors(v,trial_num,t_window,t_start)
+    svec <- generate_state_vectors(t_start,v,trial_num,t_window)
     A[,,k] <- find_adj_matrix(svec, N, t_window, nlambda = nlambda, ncores = ncores)
     
     # MSE
@@ -108,7 +108,7 @@ generate_fragility_matrix <- function(A, elec, lim = 1i) {
   )
 }
 
-generate_state_vectors <- function(v,trial,t_window,t_start) {
+generate_state_vectors <- function(t_start,v,trial,t_window) {
   data <- v[trial,,]
   
   state_vectors <- list(
@@ -123,7 +123,7 @@ generate_state_vectors <- function(v,trial,t_window,t_start) {
 
 find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   # vectorize x(t+1)
-  # state_vectors <- svec # for testing purposes
+  state_vectors <- svec # for testing purposes
   b <- c(state_vectors$x_n)
   
   # initialize big H matrix for system of linear equations
@@ -142,15 +142,15 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   
   # solve system using glmnet package least squares, with L2-norm regularization
   # aka ridge filtering
-  doMC::registerDoMC(cores = 4)
+  #doMC::registerDoMC(cores = 4)
   # find optimal lambda
-  start_time <- Sys.time()
-  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = TRUE, nlambda = nlambda)
+  start_time <- Sys.time() 
+  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = FALSE, nlambda = nlambda)
   end_time <- Sys.time()
   print(end_time - start_time)
   lambdas <- rev(cv.ridge$lambda)
   
-  test_lambda <- function(l, H, b, lambdas, ncores) {
+  test_lambda <- function(l, H, b) {
     ridge <- glmnet::glmnet(H, b, alpha = 0, lambda = l)
     N = sqrt(dim(H)[2])
     adj_matrix <-  matrix(ridge$beta, nrow = N, ncol = N, byrow = TRUE)
@@ -218,6 +218,13 @@ pt_info <- readRDS('/Users/oliverzhou/rave_data/data_dir/OnsetZone/PT01/rave/mod
 #   elec = requested_electrodes,
 #   unit = 'nV'
 # )
+
+t_window = 100
+t_step = 100
+v = pt_info$v
+trial_num = 1
+nlambda = 16
+ncores = 4
 
 options(future.globals.maxSize = 20000 * 1024^2)
 adj_info <- generate_adj_array(

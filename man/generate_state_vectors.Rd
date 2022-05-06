@@ -4,16 +4,16 @@
 \alias{generate_state_vectors}
 \title{generate_state_vectors}
 \usage{
-generate_state_vectors(v, trial, t_window, t_start)
+generate_state_vectors(t_start, v, trial, t_window)
 }
 \arguments{
+\item{t_start}{start time of current timewindow}
+
 \item{v}{3D voltage matrix}
 
 \item{trial}{trial number}
 
 \item{t_window}{timewindow size}
-
-\item{t_start}{start time of current timewindow}
 }
 \value{
 

@@ -106,34 +106,81 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
   A <- array(dim = c(N,N,J))
   mse <- vector(mode = "numeric", length = J)
   
-  doMC::registerDoMC(cores = ncores)
+  # doMC::registerDoMC(cores = ncores)
   
   adjprogress = rave::progress(title = 'Generating Adjacency Array', max = J)
   shiny::showNotification('Calculating estimated time remaining...', id = 'first_est', duration = NULL)
-  for (k in 1:J) {
-    start_time <- Sys.time()
-    print(paste0('Current timewindow: ', k, ' out of ', J))
-    adjprogress$inc(paste0('Current timewindow: ', k, ' out of ', J))
-    
-    t_start <- 1+(k-1)*t_step
-    svec <- generate_state_vectors(v,trial_num,t_window,t_start)
-    A[,,k] <- find_adj_matrix(svec, N, t_window, nlambda = nlambda, ncores = ncores)
-    
-    # MSE
-    estimate <- A[,,k] %*% svec$x
-    mse[k] <- mean((estimate - svec$x_n)^2)
-    
-    end_time <- Sys.time()
-    print(end_time - start_time)
-    
-    if (k == 1) {
-      shiny::removeNotification(id = 'first_est')
-      t_avg <- 0
+  
+  for (k in seq(1,J,ncores)) {
+    if (k+ncores-1 <= J) {
+      ks <- k:(k+ncores-1)
+      
+      start_time <- Sys.time()
+      if (ncores == 1) {
+        print(paste0('Current timewindow: ', k, ' out of ', J))
+        adjprogress$inc(paste0('Current timewindow: ', k, ' out of ', J))
+      } else {
+        print(paste0('Current timewindows: ', k, '-', k+ncores-1, ' out of ', J))
+        for (i in ks) {
+          adjprogress$inc(paste0('Current timewindows: ', k, '-', k+ncores-1, ' out of ', J))
+        }
+      }
+      
+      t_start <- 1+(ks-1)*t_step
+      # no significant diff between parallel and sequential for this calculation
+      # svec <- lapply(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window)
+      svec <- rave::lapply_async3(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window, .ncores = ncores)
+      
+      A_list <- rave::lapply_async3(svec, find_adj_matrix, N = N, t_window = t_window, nlambda = nlambda, ncores = ncores, .ncores = ncores)
+      
+      A[,,ks] <- array(unlist(A_list), dim = c(N,N,length(ks)))
+      
+      # MSE
+      for (i in 1:length(ks)) {
+        estimate <- A[,,ks[i]] %*% svec[[i]]$x
+        mse[ks[i]] <- mean((estimate - svec[[i]]$x_n)^2)
+      }
+      
+      end_time <- Sys.time()
+      print(end_time - start_time)
+      
+      if (k == 1) {
+        shiny::removeNotification(id = 'first_est')
+        t_avg <- 0
+      }
+      
+      t_avg <- (t_avg*(((k-1)/ncores)) + as.numeric(difftime(end_time, start_time, units='mins')))/(((k-1)/ncores)+1)
+      shiny::showNotification(paste0('Estimated time remaining: ', ((t_avg/ncores)*(J-k))%/%60, ' hours, ', round(((t_avg/ncores)*(J-k))%%60, digits = 1), ' minutes'), id = 'est_time', duration = NULL)
+      
+    } else {
+      ks <- k:J
+      
+      start_time <- Sys.time()
+      print(paste0('Current timewindows: ', k, '-', J, ' out of ', J))
+      for (i in ks) {
+        adjprogress$inc(paste0('Current timewindows: ', k, '-', k+ncores-1, ' out of ', J))
+      }
+      
+      t_start <- 1+(ks-1)*t_step
+      # no significant diff between parallel and sequential for this calculation
+      # svec <- lapply(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window)
+      svec <- rave::lapply_async3(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window, .ncores = ncores)
+      
+      A_list <- rave::lapply_async3(svec, find_adj_matrix, N = N, t_window = t_window, nlambda = nlambda, ncores = ncores, .ncores = ncores)
+      
+      A[,,ks] <- array(unlist(A_list), dim = c(N,N,length(ks)))
+      
+      # MSE
+      for (kk in ks) {
+        estimate <- A[,,kk] %*% svec[[kk]]$x
+        mse[kk] <- mean((estimate - svec[[kk]]$x_n)^2)
+      }
+      
+      end_time <- Sys.time()
+      print(end_time - start_time)
     }
-
-    t_avg <- (t_avg*(k-1) + as.numeric(difftime(end_time, start_time, units='mins')))/k
-    shiny::showNotification(paste0('Estimated time remaining: ', (t_avg*(J-k))%/%60, ' hours, ', round((t_avg*(J-k))%%60, digits = 1), ' minutes'), id = 'est_time', duration = NULL)
   }
+  
   shiny::removeNotification(id = 'est_time')
   
   adjprogress$close()
@@ -236,7 +283,7 @@ generate_fragility_matrix <- function(A, elec, lim = 1i) {
 #'
 #' @examples
 #' state_vectors <- generate_state_vectors(v,trial = 1,t_window = 250,t_start = 1)
-generate_state_vectors <- function(v,trial,t_window,t_start) {
+generate_state_vectors <- function(t_start,v,trial,t_window) {
   data <- v[trial,,]
   
   state_vectors <- list(
@@ -290,7 +337,7 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   # aka ridge filtering
   
   # find optimal lambda
-  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = TRUE, nlambda = nlambda)
+  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = FALSE, nlambda = nlambda)
   lambdas <- rev(cv.ridge$lambda)
   
   test_lambda <- function(l, H, b) {
@@ -307,27 +354,33 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda, ncores) {
   }
   
   l <- 1
-  stable_i <- vector(length = 0)
+  stable_i <- FALSE
   
-  while (length(stable_i) == 0) {
+  while (!stable_i) {
+    results <- test_lambda(lambdas[l], H = H, b = b)
+    stable_i <- results$stable
     
-    if ((l+ncores-1) <= length(lambdas)) {
-      results <- rave::lapply_async3(lambdas[l:(l+ncores-1)], test_lambda, H = H, b = b, .ncores = ncores)
-      stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
-    } else {
-      results <- rave::lapply_async3(lambdas[l:length(lambdas)], test_lambda, H = H, b = b, .ncores = ncores)
-      stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+    # if ((l+ncores-1) <= length(lambdas)) {
+    #   results <- rave::lapply_async3(lambdas[l:(l+ncores-1)], test_lambda, H = H, b = b, .ncores = ncores)
+    #   stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+    # } else {
+    #   results <- rave::lapply_async3(lambdas[l:length(lambdas)], test_lambda, H = H, b = b, .ncores = ncores)
+    #   stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+    #   break
+    # }
+    
+    l <- l + 1
+    
+    if (l > length(lambdas)) {
       break
     }
-    
-    l <- l + ncores
   }
   
-  if (length(stable_i) == 0) {
+  if (!stable_i) {
     stop('no lambdas result in stable adjacency matrix')
   }
   
-  adj_matrix <- results[[stable_i[1]]]$adj
+  adj_matrix <- results$adj
   
   return(adj_matrix)
 }
