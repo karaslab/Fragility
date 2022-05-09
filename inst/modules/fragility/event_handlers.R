@@ -90,8 +90,8 @@ observeEvent(
           width = 12,
           p('Generate adjacency array for: '),
           tags$blockquote(paste0(local_data$est$J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
-          p('Required futures.globals.maxSize: '),
-          tags$blockquote(format(local_data$est$Hsize, units = 'MB')),
+          #p('Required futures.globals.maxSize: '),
+          #tags$blockquote(format(local_data$est$Hsize, units = 'MB')),
           p('This might take a while. Estimated time remaining will appear after first time window is calculated.')
           # hr(),
           # local_data$est$time
@@ -113,6 +113,7 @@ observeEvent(
   input$ok, {
     # set max future.globals export size to whatever is necessary for parallel processing
     options(future.globals.maxSize = local_data$est$Hsize * 1024^2)
+    # options(future.globals.maxSize = 500 * 1024^2)
     
     # get adj_info
     local_data$adj_info <- generate_adj_array(

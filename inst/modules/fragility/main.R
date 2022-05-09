@@ -44,6 +44,10 @@ if (local_data$check$pt & is.null(isolate(local_data$pt_info)) | new_subject) {
          the patient selecting only electrodes that were previously saved. 
          Alternatively, re-process the patient to include all loaded electrodes.')
   }
+  
+  if (!any(local_data$check$adj)) {
+    new_subject <- FALSE
+  }
 }
 
 # initialize adj_info if available
@@ -98,6 +102,24 @@ rave::rave_prepare(
   subject = 'OnsetZone/KAA',
   electrodes =  c(1:43,45:80,82:116,129:164,166:184,186:223,226:235,237:244),
   epoch = 'KAA_sz',
+  time_range = c(20,20),
+  data_types = 'voltage',
+  reference = 'car'
+)
+
+rave::rave_prepare(
+  subject = 'OnsetZone/YDS_seizure',
+  electrodes =  c(1:19,21:35,42:46,48:219),
+  epoch = 'YDS_seizure',
+  time_range = c(20,20),
+  data_types = 'voltage',
+  reference = 'car'
+)
+
+rave::rave_prepare(
+  subject = 'OnsetZone/YDO_seizure',
+  electrodes =  c(1:19,21:37,44:241),
+  epoch = 'YDO_seizure',
   time_range = c(20,20),
   data_types = 'voltage',
   reference = 'car'
