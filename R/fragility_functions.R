@@ -106,8 +106,6 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
   A <- array(dim = c(N,N,J))
   mse <- vector(mode = "numeric", length = J)
   
-  # doMC::registerDoMC(cores = ncores)
-  
   adjprogress = rave::progress(title = 'Generating Adjacency Array', max = J)
   shiny::showNotification('Calculating estimated time remaining...', id = 'first_est', duration = NULL)
   

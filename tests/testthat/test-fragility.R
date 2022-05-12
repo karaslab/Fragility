@@ -1,5 +1,4 @@
 require(glmnet)
-require(doMC)
 
 process_fragility_patient <- function(v, unit, srate, halve = FALSE) {
   print('loading fragility patient')
@@ -43,8 +42,6 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
   J <- S/t_step - (t_window/t_step) + 1 # J is number of time windows
   A <- array(dim = c(N,N,J))
   mse <- vector(mode = "numeric", length = J)
-  
-  doMC::registerDoMC(cores = ncores)
   
   for (k in 1:1) {
     start_time <- Sys.time()
