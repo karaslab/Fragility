@@ -17,7 +17,6 @@ local_data = reactiveValues(
   twindow = NULL,
   tstep = NULL,
   brain_f = NULL,
-  est = NULL,
   J = NULL,
   v_loaded = NULL,
   vmat_params = NULL,
@@ -61,7 +60,7 @@ observeEvent(
     # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     
     if (local_data$check$pt) {
-      showNotification('Estimating required futures.globals.maxSize...', id = 'loading_modal', duration = NULL)
+      # showNotification('Estimating required futures.globals.maxSize...', id = 'loading_modal', duration = NULL)
       
       # convert requested_tstep and twindow from ms to # of datapoints within that timewindow using Hz
       local_data$twindow <- 2 * round(input$requested_twindow * local_data$pt_info$srate / 2000) # twindow needs to be even number
@@ -74,9 +73,17 @@ observeEvent(
       }
       
       # calculate estimated time (currently working on this feature)
-      local_data$est <- estimate_time(local_data$pt_info, local_data$tstep, local_data$twindow)
+      # local_data$est <- estimate_time(local_data$pt_info, local_data$tstep, local_data$twindow)
       
-      removeNotification(id = 'loading_modal')
+      S <- dim(local_data$pt_info$v)[2] # S is total number of timepoints
+      
+      if(S %% local_data$tstep != 0) {
+        # truncate S to greatest number evenly divisible by timestep
+        S <- trunc(S/local_data$tstep) * local_data$tstep
+      }
+      J <- S/local_data$tstep - (local_data$twindow/local_data$tstep) + 1
+      
+      # removeNotification(id = 'loading_modal')
       
       # pop-up screen with additional info for adj array processing
       showModal(modalDialog(
@@ -89,12 +96,8 @@ observeEvent(
         fluidRow(column(
           width = 12,
           p('Generate adjacency array for: '),
-          tags$blockquote(paste0(local_data$est$J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
-          #p('Required futures.globals.maxSize: '),
-          #tags$blockquote(format(local_data$est$Hsize, units = 'MB')),
+          tags$blockquote(paste0(J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
           p('This might take a while. Estimated time remaining will appear after first time window is calculated.')
-          # hr(),
-          # local_data$est$time
         ))
       ))
     } else {
@@ -112,7 +115,7 @@ observeEvent(input$cancel, {
 observeEvent(
   input$ok, {
     # set max future.globals export size to whatever is necessary for parallel processing
-    options(future.globals.maxSize = local_data$est$Hsize * 1024^2)
+    # options(future.globals.maxSize = local_data$est$Hsize * 1024^2)
     # options(future.globals.maxSize = 500 * 1024^2)
     
     # get adj_info
@@ -146,7 +149,8 @@ observeEvent(
         print('gen_f button clicked')
         local_data$f_info <- generate_fragility_matrix(
           A = local_data$adj_info$A,
-          elec = attr(local_data$pt_info$v, "dimnames")$Electrode
+          elec = attr(local_data$pt_info$v, "dimnames")$Electrode,
+          ncores = input$requested_ncores
         )
         local_data$f_info <- append(local_data$f_info, list(trial = tnum_adj))
         saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
@@ -168,7 +172,7 @@ observeEvent(
     if (exists('trial')) {
       t <- trial$Trial[trial$Condition %in% input$adj_conditions]
       # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
-      if (shiny::isTruthy(local_data$adj_info) & local_data$check$adj[t]) {
+      if (shiny::isTruthy(local_data$adj_info & local_data$check$adj[t])) {
         if (local_data$adj_info$trial != t) {
           # if the user requests adj_info for a different trial
           local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))

@@ -33,7 +33,7 @@ rave::rave_prepare(
 print('executing main')
 
 # initalize pt_info if available
-if (local_data$check$pt & is.null(isolate(local_data$pt_info)) | new_subject) {
+if (local_data$check$pt & (is.null(isolate(local_data$pt_info)) | new_subject)) {
   print('Loading pt_info first time')
   showNotification('Loading existing pre-processed patient...', id = 'pt_loading')
   # load it in if the file exists but hasn't been loaded in yet

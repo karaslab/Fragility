@@ -117,17 +117,17 @@ define_input(
 )
 
 define_input(
-  definition = checkboxInput(inputId = 'half_hz', label='Halve Sampling Rate?'),
+  definition = checkboxInput(inputId = 'half_hz', label='Halve Sampling Rate?')
 )
 
 define_input(
-  actionButton(inputId = 'process_pt', label='Pre-process Patient'),
+  actionButton(inputId = 'process_pt', label='Pre-process Patient')
 )
 
 # Step 2: Generate Model----
 
 define_input(
-  sliderInput(inputId = 'requested_twindow', label='Time Window Size (ms)', min=100, max=1000, value=100, step=10, ticks = FALSE),
+  sliderInput(inputId = 'requested_twindow', label='Time Window Size (ms)', min=100, max=1000, value=100, step=10, ticks = FALSE)
 )
 
 define_input(
@@ -142,7 +142,7 @@ define_input(
 )
 
 define_input(
-  numericInput(inputId = 'requested_nlambda', label='Number of Lambdas', min=1, max=100, value=16, step=1),
+  numericInput(inputId = 'requested_nlambda', label='Number of Lambdas', min=1, max=100, value=16, step=1)
 )
 
 define_input(
@@ -168,11 +168,11 @@ define_input(
 )
 
 define_input(
-  actionButton(inputId = 'gen_adj', label='Generate Adjacency Matrix for this Trial'),
+  actionButton(inputId = 'gen_adj', label='Generate Adjacency Matrix for this Trial')
 )
 
 define_input(
-  actionButton(inputId = 'gen_f', label='Generate Fragility Matrix for this Trial'),
+  actionButton(inputId = 'gen_f', label='Generate Fragility Matrix for this Trial')
 )
 
 # Step 3: View Fragility----
@@ -219,7 +219,7 @@ define_input(
 )
 
 define_input(
-  selectInput(inputId = 'sort_fmap', choices = c('Electrode','Fragility'), selected = 'Electrode', label='Sort Fragility Map By:'),
+  selectInput(inputId = 'sort_fmap', choices = c('Electrode','Fragility'), selected = 'Electrode', label='Sort Fragility Map By:')
 )
 
 define_input(
@@ -252,7 +252,7 @@ define_input(
 )
 
 define_input(
-  checkboxInput(inputId = 'auto_calc', label='Auto-recalculate?', value = TRUE),
+  checkboxInput(inputId = 'auto_calc', label='Auto-recalculate?', value = TRUE)
 )
 
 define_input(
@@ -305,13 +305,13 @@ define_input(
 )
 
 define_input(
-  actionButton(inputId = 'load_v_traces', label='Load EEG Voltage Traces'),
+  actionButton(inputId = 'load_v_traces', label='Load EEG Voltage Traces')
 )
 
 # Re-check Files----
 
 define_input(
-  actionButton(inputId = 'refresh_btn', label='Refresh'),
+  actionButton(inputId = 'refresh_btn', label='Refresh')
 )
 
 # the input_layout list is used by rave to determine order and grouping of layouts

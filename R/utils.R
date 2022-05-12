@@ -42,47 +42,27 @@ check_subject <- function(subject_code, subject_dir, trials) {
   )
 }
 
-# my_checks <- function (..., .raise_error = FALSE) {
-#   ctx <- rave::rave_context()
-#   res <- your_check_function(.......)
+# estimate_time <- function(pt_info, tstep, twindow) {
+#   S <- dim(pt_info$v)[2] # S is total number of timepoints
+#   N <- dim(pt_info$v)[3]
 #   
-#   
-#   
-#   if ( [failed] ) {
-#     
-#     ctx$instance$internal_reactives$miss_data <- TRUE
-#     ctx$instance$internal_reactives$miss_data_message <- "load loadload"
-#     ctx$instance$internal_reactives$miss_data_comps <- rlang::quo({
-#       # how to load your data
-#     })
-#     rave::rave_failure("Needs to load data", level = "INFO")
+#   if(S %% tstep != 0) {
+#     # truncate S to greatest number evenly divisible by timestep
+#     S <- trunc(S/tstep) * tstep
 #   }
-#   else {
-#     ctx$instance$internal_reactives$miss_data <- FALSE
-#   }
+#   J <- S/tstep - (twindow/tstep) + 1
+#   
+#   t_estimate <- 1.5*J
+#   
+#   
+#   # est_time <- paste0('Estimated time: ', t_estimate%/%60, ' hours, ', round(t_estimate%%60, digits = 1), ' minutes')
+#   # warning this H can be big
+#   # Hsize <- object.size(matrix(0, nrow = N*(twindow-1), ncol = N^2)) + (200 * 1024^2)
+#   
+#   time_estimate <- list(
+#     time = est_time,
+#     # Hsize = Hsize,
+#     J = J
+#   )
 # }
-
-estimate_time <- function(pt_info, tstep, twindow) {
-  S <- dim(pt_info$v)[2] # S is total number of timepoints
-  N <- dim(pt_info$v)[3]
-  
-  if(S %% tstep != 0) {
-    # truncate S to greatest number evenly divisible by timestep
-    S <- trunc(S/tstep) * tstep
-  }
-  J <- S/tstep - (twindow/tstep) + 1
-  
-  t_estimate <- 1.5*J
-  
-  
-  est_time <- paste0('Estimated time: ', t_estimate%/%60, ' hours, ', round(t_estimate%%60, digits = 1), ' minutes')
-  # warning this H can be big
-  Hsize <- object.size(matrix(0, nrow = N*(twindow-1), ncol = N^2)) + (200 * 1024^2)
-  
-  time_estimate <- list(
-    time = est_time,
-    Hsize = Hsize,
-    J = J
-  )
-}
 
