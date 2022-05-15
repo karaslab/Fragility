@@ -499,7 +499,7 @@ draw_f_map_table <- function(tnum, adj_info, f_path, subject_code, requested_ele
     m <- t(f_plot$norm)
   }
   
-  attr(m, 'xlab') = 'Time Window'
+  attr(m, 'xlab') = 'Time (s)'
   attr(m, 'ylab') = 'Electrode'
   attr(m, 'zlab') = 'Fragility'
   

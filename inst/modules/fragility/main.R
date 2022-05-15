@@ -72,6 +72,12 @@ possible <- list(
   f = trial$Trial[local_data$check$f]
 )
 
+# if (shiny::isTruthy(local_data$vmat_params$reload)) {
+#   print('asdf')
+#   vmat_params_main <- local_data$vmat_params
+#   local_data$vmat_params$reload <- FALSE
+# }
+
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------
 
 # Debug

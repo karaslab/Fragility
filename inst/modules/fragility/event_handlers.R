@@ -172,7 +172,7 @@ observeEvent(
     if (exists('trial')) {
       t <- trial$Trial[trial$Condition %in% input$adj_conditions]
       # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
-      if (shiny::isTruthy(local_data$adj_info & local_data$check$adj[t])) {
+      if (shiny::isTruthy(local_data$adj_info) & shiny::isTruthy(local_data$check$adj[t])) {
         if (local_data$adj_info$trial != t) {
           # if the user requests adj_info for a different trial
           local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
@@ -228,7 +228,7 @@ observeEvent(
         local_data$selected$f <- f_outputs$sel
         
         local_data$J <- length(f_outputs$f_plot_params$x)
-        local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset))
+        local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset, tp = preload_info$time_points))
         
         local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
         rebuild_3d_viewer()
@@ -278,7 +278,7 @@ observeEvent(
         local_data$selected$f <- f_outputs$sel
         
         local_data$J <- length(f_outputs$f_plot_params$x)
-        local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset))
+        local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset, tp = preload_info$time_points))
         
         local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
         rebuild_3d_viewer()
@@ -323,7 +323,7 @@ observeEvent(
     local_data$selected$f <- f_outputs$sel
     
     local_data$J <- length(f_outputs$f_plot_params$x)
-    local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset))
+    local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset, tp = preload_info$time_points))
     
     local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
     rebuild_3d_viewer()
@@ -356,7 +356,8 @@ observeEvent(
     }
     local_data$vmat_params <- list(
       mat = local_data$v[t,,as.character(local_data$voltage_electrodes)],
-      elec_labels = elec_labels
+      elec_labels = elec_labels,
+      #reload = TRUE
     )
     local_data$v_loaded <- TRUE
   }
@@ -387,7 +388,8 @@ observeEvent(
       }
       local_data$vmat_params <- list(
         mat = local_data$v[t,,as.character(local_data$voltage_electrodes)],
-        elec_labels = elec_labels
+        elec_labels = elec_labels,
+        #reload = TRUE
       )
     }
   }

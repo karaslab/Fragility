@@ -235,11 +235,12 @@ define_input(
 define_input(
   sliderInput(inputId = 'sz_onset', label='Seizure Onset Marker', min=1, max=1, value=1, step=1),
   
-  init_args = c('max','value'),
+  init_args = c('min','max','value'),
   
   init_expr = {
-    max = local_data$J
-    value = trunc(local_data$J/2)
+    min = preload_info$time_points[1]
+    max = preload_info$time_points[length(preload_info$time_points)]
+    value = 0
   }
 )
 

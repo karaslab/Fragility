@@ -34,7 +34,7 @@ fragility_table <- function(result, ...) {
 fragility_map <- function(result, ...) {
   f <- result$get_value('local_data')$f_plot_params
   shiny::validate(shiny::need(!is.null(f), message = 'No fragility map currently loaded! Please follow the steps on the left.'))
-  
+
   y=f$y
   yi = seq_along(y)
   if(length(f$y) > 10) {
@@ -42,6 +42,14 @@ fragility_map <- function(result, ...) {
     y = f$y[.seq]
     yi = .seq
   }
+  
+  # map x axis from timewindows (f$x) to time (for mtext)
+  xtime <- round(seq(f$tp[1], f$tp[length(f$tp)], length.out = 9), digits = 2)
+  xi <- seq(1, length(f$x), length.out = 9)
+  
+  # map seizure onset from time (from slider input) to timewindows (for abline)
+  secs <- seq(f$tp[1], f$tp[length(f$tp)])
+  onset <- seq(1, length(f$x), length.out = length(secs))[match(f$sz_onset,secs)]
   
   ravebuiltins:::draw_many_heat_maps(list(
     list(
@@ -51,9 +59,10 @@ fragility_map <- function(result, ...) {
       has_trials = TRUE,
       range = 0:1
     )
-  ), axes = c(TRUE,FALSE), PANEL.LAST = ravebuiltins:::add_decorator(function(...) {
-    abline(v = f$sz_onset, lty = 2, lwd = 2)
+  ), axes = c(FALSE,FALSE), PANEL.LAST = ravebuiltins:::add_decorator(function(...) {
+    abline(v = onset, lty = 2, lwd = 2)
     mtext(y, side=2, line=-1, at=yi, cex=(ravebuiltins:::rave_cex.lab*0.8), las=1)
+    mtext(xtime, side=1, line=1, at=xi, cex=(ravebuiltins:::rave_cex.lab*0.8), las=1)
   }, ravebuiltins:::spectrogram_heatmap_decorator())
   )
 }
@@ -61,6 +70,8 @@ fragility_map <- function(result, ...) {
 voltage_trace <- function(result, ...) {
   vmat_params <- result$get_value('local_data')$vmat_params
   shiny::validate(shiny::need(!is.null(vmat_params), message = 'Load the original EEG data with the button on the left.'))
+  
+  shiny::showNotification("Plotting voltage traces...", id = 'plot')
   
   # compress by factor of 4 to save plotting time
   vmat <- vmat_params$mat[seq(1,nrow(vmat_params$mat),4),]
@@ -78,4 +89,6 @@ voltage_trace <- function(result, ...) {
   }
 
   axis(2, at=0:(N-1)*3, vmat_params$elec_labels, las=1, tcl=0)
+  
+  shiny::removeNotification('plot')
 }
