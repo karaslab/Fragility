@@ -315,6 +315,19 @@ define_input(
   actionButton(inputId = 'refresh_btn', label='Refresh')
 )
 
+# Experimental----
+define_input(
+  checkboxInput(inputId = 'experimental', label = 'Enable experimental features?')
+)
+
+define_input(
+  numericInput(inputId = 'limreal', label = 'Real part of limit for fragility eigenvalue', value = 0)
+)
+
+define_input(
+  numericInput(inputId = 'limimag', label = 'Imaginary part of limit for fragility eigenvalue', value = 1)
+)
+
 # the input_layout list is used by rave to determine order and grouping of layouts
 input_layout <- list(
   '[-]Step 1: Process Patient' = list(
@@ -350,6 +363,11 @@ input_layout <- list(
   ),
   '[-]Re-check Files' = list(
     'refresh_btn'
+  ),
+  '[-]Experimental' = list(
+    'experimental',
+    'limreal',
+    'limimag'
   )
 )
 

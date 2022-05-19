@@ -147,9 +147,16 @@ observeEvent(
     if (local_data$check$pt) {
       if (local_data$check$adj[tnum_adj]) {
         print('gen_f button clicked')
+        
+        lim <- NULL
+        if (experimental) {
+          lim <- complex(real = input$limreal, imaginary = input$limimag)
+        }
+        
         local_data$f_info <- generate_fragility_matrix(
           A = local_data$adj_info$A,
           elec = attr(local_data$pt_info$v, "dimnames")$Electrode,
+          lim = lim,
           ncores = input$requested_ncores
         )
         local_data$f_info <- append(local_data$f_info, list(trial = tnum_adj))
@@ -250,7 +257,8 @@ observeEvent(
     input$sort_fmap,
     input$exp_fmap,
     input$f_list_length,
-    input$sz_onset
+    input$sz_onset,
+    input$exponentiate
   ), {
     local_data$requested_electrodes <- dipsaus::parse_svec(input$text_electrode)
     if (shiny::isTruthy(input$auto_calc) & !is.null(local_data$requested_electrodes)) {
