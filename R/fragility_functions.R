@@ -130,6 +130,7 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
       svec <- rave::lapply_async3(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window, .ncores = ncores)
       
       A_list <- rave::lapply_async3(svec, find_adj_matrix, N = N, t_window = t_window, nlambda = nlambda, .ncores = ncores)
+      # A_list <- rave::lapply_async3(svec, find_adj_matrix2, N = N, t_window = t_window, .ncores = ncores)
       
       A[,,ks] <- array(unlist(A_list), dim = c(N,N,length(ks)))
       
@@ -165,6 +166,7 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
       svec <- rave::lapply_async3(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window, .ncores = ncores)
       
       A_list <- rave::lapply_async3(svec, find_adj_matrix, N = N, t_window = t_window, nlambda = nlambda, .ncores = ncores)
+      # A_list <- rave::lapply_async3(svec, find_adj_matrix2, N = N, t_window = t_window, .ncores = ncores)
       
       A[,,ks] <- array(unlist(A_list), dim = c(N,N,length(ks)))
       
@@ -368,15 +370,6 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda) {
     results <- test_lambda(lambdas[l], H = H, b = b)
     stable_i <- results$stable
     
-    # if ((l+ncores-1) <= length(lambdas)) {
-    #   results <- rave::lapply_async3(lambdas[l:(l+ncores-1)], test_lambda, H = H, b = b, .ncores = ncores)
-    #   stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
-    # } else {
-    #   results <- rave::lapply_async3(lambdas[l:length(lambdas)], test_lambda, H = H, b = b, .ncores = ncores)
-    #   stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
-    #   break
-    # }
-    
     l <- l + 1
     
     if (l > length(lambdas)) {
@@ -392,6 +385,35 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda) {
   
   return(adj_matrix)
 }
+
+# deprecated version of find_adj_matrix that uses set lambda value of 10 * 10^-5
+# find_adj_matrix2 <- function(state_vectors, N, t_window) {
+#   # vectorize x(t+1)
+#   # state_vectors <- svec # for testing purposes
+#   b <- c(state_vectors$x_n)
+#   
+#   # initialize big H matrix for system of linear equations
+#   H <- matrix(0, nrow = N*(t_window-1), ncol = N^2)
+#   
+#   # populate H matrix
+#   r <- 1
+#   for (ii in 1:(t_window-1)) {
+#     c <- 1
+#     for (jj in 1:N) {
+#       H[r,c:(c+N-1)] <- state_vectors$x[,ii]
+#       c <- c + N
+#       r <- r + 1
+#     }
+#   }
+#   
+#   # solve system using glmnet package least squares, with L2-norm regularization
+#   # aka ridge filtering
+#   
+#   result <- glmnet::glmnet(H,b,alpha = 0, lambda = 10 * 10^-5)
+#   adj_matrix <- matrix(result$beta, nrow = N, ncol = N)
+#   
+#   return(adj_matrix)
+# }
 
 #' find_fragility 
 #' 

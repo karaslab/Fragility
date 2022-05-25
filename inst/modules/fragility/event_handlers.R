@@ -148,17 +148,22 @@ observeEvent(
       if (local_data$check$adj[tnum_adj]) {
         print('gen_f button clicked')
         
-        lim <- NULL
         if (experimental) {
           lim <- complex(real = input$limreal, imaginary = input$limimag)
+          local_data$f_info <- generate_fragility_matrix(
+            A = local_data$adj_info$A,
+            elec = attr(local_data$pt_info$v, "dimnames")$Electrode,
+            lim = lim,
+            ncores = input$requested_ncores
+          )
+        } else {
+          local_data$f_info <- generate_fragility_matrix(
+            A = local_data$adj_info$A,
+            elec = attr(local_data$pt_info$v, "dimnames")$Electrode,
+            ncores = input$requested_ncores
+          )
         }
         
-        local_data$f_info <- generate_fragility_matrix(
-          A = local_data$adj_info$A,
-          elec = attr(local_data$pt_info$v, "dimnames")$Electrode,
-          lim = lim,
-          ncores = input$requested_ncores
-        )
         local_data$f_info <- append(local_data$f_info, list(trial = tnum_adj))
         saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
         # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
@@ -364,7 +369,7 @@ observeEvent(
     }
     local_data$vmat_params <- list(
       mat = local_data$v[t,,as.character(local_data$voltage_electrodes)],
-      elec_labels = elec_labels,
+      elec_labels = elec_labels
       #reload = TRUE
     )
     local_data$v_loaded <- TRUE
@@ -396,7 +401,7 @@ observeEvent(
       }
       local_data$vmat_params <- list(
         mat = local_data$v[t,,as.character(local_data$voltage_electrodes)],
-        elec_labels = elec_labels,
+        elec_labels = elec_labels
         #reload = TRUE
       )
     }
