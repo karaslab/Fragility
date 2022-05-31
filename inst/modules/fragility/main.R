@@ -97,7 +97,7 @@ Fragility::dev_Fragility(expose_functions = TRUE)
 # mount_demo_subject()
 rave::rave_prepare(
   subject = 'OnsetZone/PT01',
-  electrodes =  c(1:24,26:36,42:43,46:54,56:70,72:95),
+  electrodes =  c(1:4,7:36,42:43,46:69,72:95),
   epoch = 'PT01_sz',
   time_range = c(20,20),
   data_types = 'voltage',
@@ -130,6 +130,17 @@ rave::rave_prepare(
   data_types = 'voltage',
   reference = 'car'
 )
+
+rave::rave_prepare(
+  subject = 'OnsetZone/PT026',
+  electrodes =  c(1:4,7:12,15:23,25:33,47:63,65:66,69:71,73:110),
+  epoch = 'PT_026_sz',
+  time_range = c(20,20),
+  data_types = 'voltage',
+  reference = 'car'
+)
+
+
 
 view_layout('fragility')
 

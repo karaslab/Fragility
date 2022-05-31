@@ -526,8 +526,10 @@ draw_f_map_table <- function(tnum, adj_info, f_path, subject_code, requested_ele
   attr(m, 'zlab') = 'Fragility'
   
   if (check$elist) {
-    y <- paste0(check$elec_list$Label[elec_order], '(', elec_order, ')')
-    f_list <- paste0(check$elec_list$Label[fsort], '(', fsort, ')')
+    elec_i <- match(elec_order, check$elec_list$Electrode)
+    y <- paste0(check$elec_list$Label[elec_i], '(', elec_order, ')')
+    elec_i <- match(fsort, check$elec_list$Electrode)
+    f_list <- paste0(check$elec_list$Label[elec_i], '(', fsort, ')')
   } else {
     y <- elec_order
     f_list <- fsort

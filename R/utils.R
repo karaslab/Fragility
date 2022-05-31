@@ -32,7 +32,6 @@ check_subject <- function(subject_code, subject_dir, trials) {
     elist <- FALSE
   }
   
-  
   check <- list(
     pt = pt,
     adj = adj,
