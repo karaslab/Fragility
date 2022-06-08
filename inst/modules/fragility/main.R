@@ -7,6 +7,7 @@ dev_Fragility(expose_functions = TRUE)
 
 # mount_demo_subject()
 
+# mount PT01 as demo subject
 rave::rave_prepare(
   subject = 'OnsetZone/PT01',
   electrodes =  c(1:24,26:36,42:43,46:54,56:70,72:95),
@@ -16,33 +17,36 @@ rave::rave_prepare(
   reference = 'car'
 )
 
+# initiates module in R environment
 init_module('fragility', debug = TRUE)
-
-rave::rave_prepare(
-  subject = 'OnsetZone/KAA',
-  electrodes =  c(1:116,129:244),
-  epoch = 'KAA_sz',
-  time_range = c(20,20),
-  data_types = 'voltage',
-  reference = 'car'
-)
 
 # >>>>>>>>>>>> Start ------------- [DO NOT EDIT THIS LINE] ---------------------
 ######' @auto=TRUE
 
 print('executing main')
 
-# initalize pt_info if available
+# initialize and load pt_info if available
+local_data$elec_present <- TRUE
 if (local_data$check$pt & (is.null(isolate(local_data$pt_info)) | new_subject)) {
   print('Loading pt_info first time')
   showNotification('Loading existing pre-processed patient...', id = 'pt_loading')
+  
   # load it in if the file exists but hasn't been loaded in yet
   local_data$pt_info <- readRDS(paste0(module_data,'/',subject_code,'_pt_info'))
   removeNotification('pt_loading')
-  if (!all(as.character(preload_info$electrodes) %in% attr(local_data$pt_info$v, "dimnames")$Electrode)){
-    stop('Not all loaded electrodes are present in saved pt_info! Please reload 
-         the patient selecting only electrodes that were previously saved. 
-         Alternatively, re-process the patient to include all loaded electrodes.')
+  
+  # check if saved pt_info electrodes match the loaded electrodes
+  elec_check <- as.character(preload_info$electrodes) %in% attr(local_data$pt_info$v, "dimnames")$Electrode
+  if (!all(elec_check)){
+    missing_i <- which(!elec_check)
+    
+    local_data$elec_present <- FALSE
+    
+    shiny::showNotification(paste0('Not all loaded electrodes are present in saved pt_info! 
+                Electrodes missing from pt_info: ', 
+                dipsaus::deparse_svec(preload_info$electrodes[missing_i])), duration = NULL, type = 'error')
+    shiny::showNotification('Please reload the patient selecting only electrodes that were previously saved. 
+                            Alternatively, re-process the patient to include all loaded electrodes.', duration = NULL, type = 'error')
   }
   
   if (!any(local_data$check$adj)) {
@@ -54,6 +58,8 @@ if (local_data$check$pt & (is.null(isolate(local_data$pt_info)) | new_subject)) 
 if (any(local_data$check$adj) & (is.null(isolate(local_data$adj_info)) | new_subject)) {
   print('Loading adj_info first time')
   showNotification('Loading existing adjacency array...', id = 'adj_loading')
+  
+  # automatically load first trial as default
   tnum_adj <- which(local_data$check$adj)[1]
   local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
   local_data$selected$adj <- local_data$adj_info$trial
@@ -64,19 +70,15 @@ if (any(local_data$check$adj) & (is.null(isolate(local_data$adj_info)) | new_sub
   tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
 }
 
+# check which files are available every recalculate
 local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+
 # update available trials every recalculate
 possible <- list(
   pt = local_data$check$pt,
   adj = trial$Trial[local_data$check$adj],
   f = trial$Trial[local_data$check$f]
 )
-
-# if (shiny::isTruthy(local_data$vmat_params$reload)) {
-#   print('asdf')
-#   vmat_params_main <- local_data$vmat_params
-#   local_data$vmat_params$reload <- FALSE
-# }
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------
 
@@ -91,13 +93,13 @@ result = ret$results
 
 result$get_value('preload_info')
 
-
 # Debug - online:
 Fragility::dev_Fragility(expose_functions = TRUE)
+
 # mount_demo_subject()
 rave::rave_prepare(
   subject = 'OnsetZone/PT01',
-  electrodes =  c(1:4,7:36,42:43,46:69,72:95),
+  electrodes =  c(1:4,7:24,26:36,42:43,46:54,56:69,72:95),
   epoch = 'PT01_sz',
   time_range = c(20,20),
   data_types = 'voltage',
@@ -139,8 +141,6 @@ rave::rave_prepare(
   data_types = 'voltage',
   reference = 'car'
 )
-
-
 
 view_layout('fragility')
 

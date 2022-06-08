@@ -371,7 +371,7 @@ for (k in 1:J){
 }
 
 par(mfrow=c(2,1),mar=rep(2,4))
-timepoints <- 1:100
+timepoints <- 1:300
 plot(x = timepoints, y = v_trace[1,timepoints], type = 'l')
 plot(x = timepoints, y = v_recon[1,timepoints], type = 'l')
 plot(x = timepoints, y = v_reconX[1,timepoints], type = 'l')

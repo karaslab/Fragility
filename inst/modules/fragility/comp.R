@@ -136,7 +136,10 @@ define_input(
   init_args = c('choices', 'selected'),
   
   init_expr = {
+    # set timestep choices to either size of timewindow or half of timewindow
     choices = c(input$requested_twindow, input$requested_twindow/2)
+    
+    # default timestep is equal to timewindow
     selected = input$requested_twindow
   }
 )
@@ -151,6 +154,7 @@ define_input(
   init_args = c('max', 'value'),
   
   init_expr = {
+    # default number of cores to half of maximum
     max = as.numeric(rave::rave_options('max_worker'))
     value = (max + 1)/2
   }
@@ -227,6 +231,7 @@ define_input(
   init_args = c('max','value'),
   
   init_expr = {
+    # default length of list is half of number of loaded electrodes
     max = floor(length(preload_info$electrodes)/2)
     value = min(c(floor(length(preload_info$electrodes)/8), 10))
   }
@@ -262,6 +267,8 @@ define_input(
   init_args = c('label'),
   
   init_expr = {
+    
+    # enable calculate fragility button only if fragility matrix files exist
     if (any(local_data$check$f)){
       label = 'Calculate Fragility!'
       shinyjs::enable('draw_f_map')
