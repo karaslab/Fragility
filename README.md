@@ -7,6 +7,6 @@ RAVE is a powerful, free, open-source, NIH-funded research tool designed to anal
 
 ## Installation Instructions
 
-The Fragility module can be installed with the following command: `remotes::install_github('ozmosis17/fragility')`
+The Fragility module can be installed with the following command: `remotes::install_github('karaslab/fragility')`
 
 After installing, it needs to be recognized by RAVE. Run `rave::rave_options()` and then click the "check for new modules button". The fragility module should now appear in the module list. Then, run `rave::arrange_modules` and restart R and RStudio. The next time you run `start_rave()`, the Fragility module will show up in the left-hand menu.
