@@ -522,8 +522,10 @@ draw_f_map_table <- function(tnum, f_path, subject_code, requested_electrodes, s
   elecsort <- sort(as.numeric(attr(f_plot$norm, "dimnames")[[1]]))
   fsort <- as.numeric(attr(sort(f_plot$avg), "names"))
   
-  if (sort_fmap == 'Electrode') {
+  if (sort_fmap == 'Electrode (ascending)') {
     elec_order <- elecsort
+  } else if (sort_fmap == 'Electrode (descending)') {
+    elec_order <- rev(elecsort)
   } else if (sort_fmap == 'Fragility') {
     elec_order <- fsort
   }

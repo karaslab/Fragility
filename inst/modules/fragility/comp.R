@@ -223,7 +223,7 @@ define_input(
 )
 
 define_input(
-  selectInput(inputId = 'sort_fmap', choices = c('Electrode','Fragility'), selected = 'Electrode', label='Sort Fragility Map By:')
+  selectInput(inputId = 'sort_fmap', choices = c('Electrode (descending)', 'Electrode (ascending)','Fragility'), selected = 'Electrode (descending)', label='Sort Fragility Map By:')
 )
 
 define_input(

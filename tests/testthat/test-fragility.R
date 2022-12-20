@@ -1,7 +1,7 @@
 require(glmnet)
 
 process_fragility_patient <- function(v, unit, srate, halve = FALSE) {
-  print('loading fragility patient')
+  print('Pre-processing fragility patient')
   
   newunit <- 'uV'
   
@@ -39,10 +39,17 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
     # truncate S to greatest number evenly divisible by timestep
     S <- trunc(S/t_step) * t_step
   }
+  
   J <- S/t_step - (t_window/t_step) + 1 # J is number of time windows
+  
+  # A will be the adjacency array, contains J adjacency matrices (one per time window)
   A <- array(dim = c(N,N,J))
   mse <- vector(mode = "numeric", length = J)
   
+  #adjprogress = rave::progress(title = 'Generating Adjacency Array', max = J)
+  #shiny::showNotification('Calculating estimated time remaining...', id = 'first_est', duration = NULL)
+  
+  # run multiple timewindows in parallel depending on number of cores selected
   for (k in seq(1,J,ncores)) {
     if (k+ncores-1 <= J) {
       ks <- k:(k+ncores-1)
@@ -50,8 +57,12 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
       start_time <- Sys.time()
       if (ncores == 1) {
         print(paste0('Current timewindow: ', k, ' out of ', J))
+        #adjprogress$inc(paste0('Current timewindow: ', k, ' out of ', J))
       } else {
         print(paste0('Current timewindows: ', k, '-', k+ncores-1, ' out of ', J))
+        # for (i in ks) {
+        #   adjprogress$inc(paste0('Current timewindows: ', k, '-', k+ncores-1, ' out of ', J))
+        # }
       }
       
       t_start <- 1+(ks-1)*t_step
@@ -59,7 +70,8 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
       # svec <- lapply(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window)
       svec <- rave::lapply_async3(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window, .ncores = ncores)
       
-      A_list <- rave::lapply_async3(svec, find_adj_matrix_solve, N = N, t_window = t_window, nlambda = nlambda, .ncores = ncores)
+      A_list <- rave::lapply_async3(svec, find_adj_matrix, N = N, t_window = t_window, nlambda = nlambda, .ncores = ncores)
+      # A_list <- rave::lapply_async3(svec, find_adj_matrix2, N = N, t_window = t_window, .ncores = ncores)
       
       A[,,ks] <- array(unlist(A_list), dim = c(N,N,length(ks)))
       
@@ -73,24 +85,29 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
       print(end_time - start_time)
       
       if (k == 1) {
+        #shiny::removeNotification(id = 'first_est')
         t_avg <- 0
       }
       
       t_avg <- (t_avg*(((k-1)/ncores)) + as.numeric(difftime(end_time, start_time, units='mins')))/(((k-1)/ncores)+1)
-      print(paste0('Estimated time remaining: ', ((t_avg/ncores)*(J-k))%/%60, ' hours, ', round(((t_avg/ncores)*(J-k))%%60, digits = 1), ' minutes'), id = 'est_time', duration = NULL)
-      
+      #shiny::showNotification(paste0('Estimated time remaining: ', ((t_avg/ncores)*(J-k))%/%60, ' hours, ', round(((t_avg/ncores)*(J-k))%%60, digits = 1), ' minutes'), id = 'est_time', duration = NULL)
+      print(paste0('Estimated time remaining: ', ((t_avg/ncores)*(J-k))%/%60, ' hours, ', round(((t_avg/ncores)*(J-k))%%60, digits = 1), ' minutes'))
     } else {
       ks <- k:J
       
       start_time <- Sys.time()
       print(paste0('Current timewindows: ', k, '-', J, ' out of ', J))
+      # for (i in ks) {
+      #   adjprogress$inc(paste0('Current timewindows: ', k, '-', k+ncores-1, ' out of ', J))
+      # }
       
       t_start <- 1+(ks-1)*t_step
       # no significant diff between parallel and sequential for this calculation
       # svec <- lapply(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window)
       svec <- rave::lapply_async3(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window, .ncores = ncores)
       
-      A_list <- rave::lapply_async3(svec, find_adj_matrix_solve, N = N, t_window = t_window, nlambda = nlambda, .ncores = ncores)
+      A_list <- rave::lapply_async3(svec, find_adj_matrix, N = N, t_window = t_window, nlambda = nlambda, .ncores = ncores)
+      # A_list <- rave::lapply_async3(svec, find_adj_matrix2, N = N, t_window = t_window, .ncores = ncores)
       
       A[,,ks] <- array(unlist(A_list), dim = c(N,N,length(ks)))
       
@@ -105,11 +122,97 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
     }
   }
   
+  #shiny::removeNotification(id = 'est_time')
+  
+  #adjprogress$close()
+  
   adj_info <- list(
     A = A,
     mse = mse
   )
 }
+
+# generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) {
+#   print('Generating adjacency array')
+#   
+#   S <- dim(v)[2] # S is total number of timepoints
+#   N <- dim(v)[3] # N is number of electrodes
+#   
+#   if(S %% t_step != 0) {
+#     # truncate S to greatest number evenly divisible by timestep
+#     S <- trunc(S/t_step) * t_step
+#   }
+#   J <- S/t_step - (t_window/t_step) + 1 # J is number of time windows
+#   A <- array(dim = c(N,N,J))
+#   mse <- vector(mode = "numeric", length = J)
+#   
+#   for (k in seq(1,J,ncores)) {
+#     if (k+ncores-1 <= J) {
+#       ks <- k:(k+ncores-1)
+#       
+#       start_time <- Sys.time()
+#       if (ncores == 1) {
+#         print(paste0('Current timewindow: ', k, ' out of ', J))
+#       } else {
+#         print(paste0('Current timewindows: ', k, '-', k+ncores-1, ' out of ', J))
+#       }
+#       
+#       t_start <- 1+(ks-1)*t_step
+#       # no significant diff between parallel and sequential for this calculation
+#       # svec <- lapply(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window)
+#       svec <- rave::lapply_async3(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window, .ncores = ncores)
+#       str(svec)
+#       A_list <- rave::lapply_async3(svec, find_adj_matrix, N = N, t_window = t_window, nlambda = nlambda, .ncores = ncores)
+#       
+#       A[,,ks] <- array(unlist(A_list), dim = c(N,N,length(ks)))
+#       
+#       # MSE
+#       for (i in 1:length(ks)) {
+#         estimate <- A[,,ks[i]] %*% svec[[i]]$x
+#         mse[ks[i]] <- mean((estimate - svec[[i]]$x_n)^2)
+#       }
+#       
+#       end_time <- Sys.time()
+#       print(end_time - start_time)
+#       
+#       if (k == 1) {
+#         t_avg <- 0
+#       }
+#       
+#       t_avg <- (t_avg*(((k-1)/ncores)) + as.numeric(difftime(end_time, start_time, units='mins')))/(((k-1)/ncores)+1)
+#       print(paste0('Estimated time remaining: ', ((t_avg/ncores)*(J-k))%/%60, ' hours, ', round(((t_avg/ncores)*(J-k))%%60, digits = 1), ' minutes'), id = 'est_time', duration = NULL)
+#       
+#     } else {
+#       ks <- k:J
+#       
+#       start_time <- Sys.time()
+#       print(paste0('Current timewindows: ', k, '-', J, ' out of ', J))
+#       
+#       t_start <- 1+(ks-1)*t_step
+#       # no significant diff between parallel and sequential for this calculation
+#       # svec <- lapply(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window)
+#       svec <- rave::lapply_async3(t_start, generate_state_vectors, v = v, trial = trial_num, t_window = t_window, .ncores = ncores)
+#       
+#       A_list <- rave::lapply_async3(svec, find_adj_matrix, N = N, t_window = t_window, nlambda = nlambda, .ncores = ncores)
+#       
+#       A[,,ks] <- array(unlist(A_list), dim = c(N,N,length(ks)))
+#       
+#       # MSE
+#       for (i in 1:length(ks)) {
+#         estimate <- A[,,ks[i]] %*% svec[[i]]$x
+#         mse[ks[i]] <- mean((estimate - svec[[i]]$x_n)^2)
+#       }
+#       
+#       end_time <- Sys.time()
+#       print(end_time - start_time)
+#     }
+#   }
+#   
+#   adj_info <- list(
+#     A = A,
+#     mse = mse
+#   )
+# }
 
 generate_fragility_matrix <- function(A, elec, lim = 1i, ncores) {
   print('Generating fragility matrix')
@@ -117,10 +220,13 @@ generate_fragility_matrix <- function(A, elec, lim = 1i, ncores) {
   N <- dim(A)[1]
   J <- dim(A)[3]
   f_vals <- matrix(nrow = N, ncol = J)
-
+  #fprogress = rave::progress(title = 'Generating Fragility Matrix', max = J)
+  #shiny::showNotification('Calculating estimated time remaining...', id = 'first_est', duration = NULL)
+  
   for (k in 1:J) {
     start_time <- Sys.time()
     print(paste0('Current timewindow: ', k, ' out of ', J))
+    #fprogress$inc(paste0('Current timewindow: ', k, ' out of ', J))
     
     for (i in seq(1,N,ncores)) {
       if (i+ncores-1 <= N) {
@@ -138,13 +244,17 @@ generate_fragility_matrix <- function(A, elec, lim = 1i, ncores) {
     print(end_time - start_time)
     
     if (k == 1) {
+      #shiny::removeNotification(id = 'first_est')
       t_avg <- 0
     }
     
     t_avg <- (t_avg*(k-1) + as.numeric(difftime(end_time, start_time, units='sec')))/k
-    print(paste0('Estimated time remaining: ', (t_avg*(J-k))%/%60, ' minutes'), id = 'est_time', duration = NULL)
+    #shiny::showNotification(paste0('Estimated time remaining: ', (t_avg*(J-k))%/%60, ' minutes'), id = 'est_time', duration = NULL)
+    print(paste0('Estimated time remaining: ', (t_avg*(J-k))%/%60, ' minutes'))
   }
   
+  #shiny::removeNotification(id = 'est_time')
+  #fprogress$close()
   rownames(f_vals) <- elec
   colnames(f_vals) <- 1:J
   
@@ -184,9 +294,10 @@ generate_state_vectors <- function(t_start,v,trial,t_window) {
   return(state_vectors)
 }
 
+
 find_adj_matrix <- function(state_vectors, N, t_window, nlambda) {
   # vectorize x(t+1)
-  state_vectors <- svec[[1]] # for testing purposes
+  # state_vectors <- svec # for testing purposes
   b <- c(state_vectors$x_n)
   
   # initialize big H matrix for system of linear equations
@@ -207,11 +318,11 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda) {
   # aka ridge filtering
   
   # find optimal lambda
-  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 0, nfolds = 3, parallel = FALSE, nlambda = nlambda)
+  cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 1, nfolds = 3, parallel = FALSE, nlambda = nlambda)
   lambdas <- rev(cv.ridge$lambda)
   
   test_lambda <- function(l, H, b) {
-    ridge <- glmnet::glmnet(H, b, alpha = 0, lambda = l)
+    ridge <- glmnet::glmnet(H, b, alpha = 1, lambda = l)
     N <- sqrt(dim(H)[2])
     adj_matrix <-  matrix(ridge$beta, nrow = N, ncol = N, byrow = TRUE)
     eigv <- abs(eigen(adj_matrix, only.values = TRUE)$values)
@@ -230,15 +341,6 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda) {
     results <- test_lambda(lambdas[l], H = H, b = b)
     stable_i <- results$stable
     
-    # if ((l+ncores-1) <= length(lambdas)) {
-    #   results <- rave::lapply_async3(lambdas[l:(l+ncores-1)], test_lambda, H = H, b = b, .ncores = ncores)
-    #   stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
-    # } else {
-    #   results <- rave::lapply_async3(lambdas[l:length(lambdas)], test_lambda, H = H, b = b, .ncores = ncores)
-    #   stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
-    #   break
-    # }
-    
     l <- l + 1
     
     if (l > length(lambdas)) {
@@ -254,6 +356,77 @@ find_adj_matrix <- function(state_vectors, N, t_window, nlambda) {
   
   return(adj_matrix)
 }
+
+# find_adj_matrix <- function(state_vectors, N, t_window, nlambda) {
+#   # vectorize x(t+1)
+#   state_vectors <- svec[[1]] # for testing purposes
+#   b <- c(state_vectors$x_n)
+#   
+#   # initialize big H matrix for system of linear equations
+#   H <- matrix(0, nrow = N*(t_window-1), ncol = N^2)
+#   
+#   # populate H matrix
+#   r <- 1
+#   for (ii in 1:(t_window-1)) {
+#     c <- 1
+#     for (jj in 1:N) {
+#       H[r,c:(c+N-1)] <- state_vectors$x[,ii]
+#       c <- c + N
+#       r <- r + 1
+#     }
+#   }
+#   
+#   # solve system using glmnet package least squares, with L2-norm regularization
+#   # aka ridge filtering
+#   
+#   # find optimal lambda
+#   cv.ridge <- glmnet::cv.glmnet(H, b, alpha = 1, nfolds = 3, parallel = FALSE, nlambda = nlambda)
+#   lambdas <- rev(cv.ridge$lambda)
+#   
+#   test_lambda <- function(l, H, b) {
+#     ridge <- glmnet::glmnet(H, b, alpha = 1, lambda = l)
+#     N <- sqrt(dim(H)[2])
+#     adj_matrix <-  matrix(ridge$beta, nrow = N, ncol = N, byrow = TRUE)
+#     eigv <- abs(eigen(adj_matrix, only.values = TRUE)$values)
+#     stable <- max(eigv) < 1
+#     list(
+#       adj = adj_matrix,
+#       abs_eigv = eigv,
+#       stable = stable
+#     )
+#   }
+#   
+#   l <- 1
+#   stable_i <- FALSE
+#   
+#   while (!stable_i) {
+#     results <- test_lambda(lambdas[l], H = H, b = b)
+#     stable_i <- results$stable
+#     
+#     # if ((l+ncores-1) <= length(lambdas)) {
+#     #   results <- rave::lapply_async3(lambdas[l:(l+ncores-1)], test_lambda, H = H, b = b, .ncores = ncores)
+#     #   stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+#     # } else {
+#     #   results <- rave::lapply_async3(lambdas[l:length(lambdas)], test_lambda, H = H, b = b, .ncores = ncores)
+#     #   stable_i <- which(unname(unlist(lapply(results, function (x) x['stable']))))
+#     #   break
+#     # }
+#     
+#     l <- l + 1
+#     
+#     if (l > length(lambdas)) {
+#       break
+#     }
+#   }
+#   
+#   if (!stable_i) {
+#     stop('No lambdas result in a stable adjacency matrix. Increase the number of lambdas, or (more likely) there is something wrong with your data.')
+#   }
+#   
+#   adj_matrix <- results$adj
+#   
+#   return(adj_matrix)
+# }
 
 find_adj_matrix_solve <- function(state_vectors, N, t_window, nlambda) {
   # vectorize x(t+1)
@@ -283,8 +456,6 @@ find_fragility <- function(node, A_k, N, limit) {
   
   e_k <- vector(mode = 'numeric', length = N)
   e_k[node] <- 1
-  # limit <- 0.707107+0.707107i
-  # limit <- 1+1i
   
   argument <- t(e_k) %*% (solve(A_k - limit*diag(N))) # column perturbation
   # argument <- t(e_k) %*% t(solve(A_k - num*diag(N))) # row perturbation
@@ -317,12 +488,12 @@ ncores = 4
 
 options(future.globals.maxSize = 20000 * 1024^2)
 adj_info <- generate_adj_array(
-  t_window = 300,
-  t_step = 150,
+  t_window = 100,
+  t_step = 100,
   v = pt_info$v,
   trial_num = 1,
   nlambda = 16,
-  ncores = 16
+  ncores = 4
 )
 
 S <- dim(v)[2] # S is total number of timepoints
@@ -337,7 +508,7 @@ if(S %% t_step != 0) {
 }
 J <- S/t_step - (t_window/t_step) + 1 # J is number of time windows
 
-X <- read.csv('/Volumes/OFZ1_T7/karaslab/X.csv')$b
+X <- read.csv('/Volumes/OFZ1_T7/karaslab/PT01_X_MATLAB.csv')$b
 adj_mat <- matrix(X,nrow = 85, ncol = 85, byrow = TRUE)
 
 test <- pracma::mldivide(H,b)
@@ -349,6 +520,15 @@ for (k in 1:J){
   v_recon[,t_start] <- v_trace[,t_start]
   for (i in (t_start):(t_start+t_window-1)) {
     v_recon[,i+1] <- adj_info$A[,,k] %*% v_recon[,i]
+  }
+}
+
+v_reconA <- v_recon
+for (k in 1:J){
+  t_start <- 1+(k-1)*t_step
+  v_reconX[,t_start] <- v_trace[,t_start]
+  for (i in (t_start):(t_start+t_window-1)) {
+    v_reconX[,i+1] <- adj_info_alpha1$A[,,k] %*% v_reconA[,i]
   }
 }
 
@@ -370,10 +550,11 @@ for (k in 1:J){
   }
 }
 
-par(mfrow=c(2,1),mar=rep(2,4))
-timepoints <- 1:300
+par(mfrow=c(4,1),mar=rep(2,4))
+timepoints <- 1:100
 plot(x = timepoints, y = v_trace[1,timepoints], type = 'l')
 plot(x = timepoints, y = v_recon[1,timepoints], type = 'l')
+plot(x = timepoints, y = v_reconA[1,timepoints], type = 'l')
 plot(x = timepoints, y = v_reconX[1,timepoints], type = 'l')
 plot(x = timepoints, y = v_reconG[1,timepoints], type = 'l')
 
