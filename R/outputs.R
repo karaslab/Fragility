@@ -11,7 +11,7 @@ current_sel <- function(result, ...){
   } else {
     sel$f <- toString(sel$f)
   }
-  paste0('Adjacency Array: ', sel$adj, ' | Fragility Map: ', sel$f)
+  cat(paste0('Adjacency Array: ', sel$adj), paste0('Fragility Map: ', sel$f), sep = '\n')
 }
 
 possible_sel <- function(result, ...){
@@ -22,7 +22,7 @@ possible_sel <- function(result, ...){
   if (all(pos$f == '')){
     pos$f <- 'None'
   }
-  paste0('Pt. Processed? ', pos$pt, ' | Adj. Array: ', pos$adj, ' | Frag. Map: ', pos$f)
+  cat(paste0('Pt. Processed? ', pos$pt), paste0('Adj. Array: ', pos$adj), paste0('Frag. Map: ', pos$f), sep = '\n')
 }
 
 fragility_table <- function(result, ...) {

@@ -526,8 +526,10 @@ draw_f_map_table <- function(tnum, f_path, subject_code, requested_electrodes, s
     elec_order <- elecsort
   } else if (sort_fmap == 'Electrode (descending)') {
     elec_order <- rev(elecsort)
-  } else if (sort_fmap == 'Fragility') {
+  } else if (sort_fmap == 'Fragility (ascending)') {
     elec_order <- fsort
+  } else if (sort_fmap == 'Fragility (descending)') {
+    elec_order <- rev(fsort)
   }
   
   if (is.vector(f_plot$norm)){
@@ -544,6 +546,7 @@ draw_f_map_table <- function(tnum, f_path, subject_code, requested_electrodes, s
   attr(m, 'ylab') = 'Electrode'
   attr(m, 'zlab') = 'Fragility'
   
+  # if electrodes are named, label by name; otherwise, label by number
   if (check$elist) {
     elec_i <- match(elec_order, check$elec_list$Electrode)
     y <- paste0(check$elec_list$Label[elec_i], '(', elec_order, ')')
@@ -558,7 +561,8 @@ draw_f_map_table <- function(tnum, f_path, subject_code, requested_electrodes, s
     mat = m,
     x = x,
     y = y,
-    zlim = c(0,1)
+    zlim = c(0,1),
+    elec_order = elec_order
   )
   
   f_table_params <- data.frame(

@@ -21,6 +21,7 @@ local_data = reactiveValues(
   brain_f = NULL,
   J = NULL,
   v_loaded = NULL,
+  v_reload = 0,
   vmat_params = NULL,
   f_plot_params = NULL,
   f_table_params = NULL,
@@ -188,7 +189,7 @@ observeEvent(
           local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
         }
         # save currently selected trial for "Currently Loaded Trials" display
-        local_data$selected$adj <- local_data$adj_info$trial
+        local_data$selected$adj <- module_tools$get_meta('trials')$Condition[local_data$adj_info$trial]
       }
       updateActionButton(session = session, inputId = 'gen_adj', 
                          label = paste0('Generate Adjacency Array for ', input$adj_conditions))
@@ -214,7 +215,7 @@ observeEvent(
       
       # change voltage trace electrode selector if sync option is enabled
       if (input$v_sync) {
-        updateTextInput(session = session, inputId = 'v_electrode', value = input$text_electrode)
+        local_data$v_reload <- local_data$v_reload + 1
       }
       
       # update fragility list length input to reflect number of electrodes selected
@@ -245,7 +246,7 @@ observeEvent(
         local_data$brain_f <- f_outputs$brain_f
         local_data$f_plot_params <- f_outputs$f_plot_params
         local_data$f_table_params <- f_outputs$f_table_params
-        local_data$selected$f <- f_outputs$sel
+        local_data$selected$f <- module_tools$get_meta('trials')$Condition[f_outputs$sel]
         
         local_data$J <- length(f_outputs$f_plot_params$x)
         local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset, tp = preload_info$time_points))
@@ -281,6 +282,11 @@ observeEvent(
     # assign requested electrodes from text_electrode input
     local_data$requested_electrodes <- dipsaus::parse_svec(input$text_electrode)
     
+    # change voltage trace electrode selector if sync option is enabled
+    if (shiny::isTruthy(input$v_sync) & shiny::isTruthy(local_data$v_loaded)) {
+      local_data$v_reload <- local_data$v_reload + 1
+    }
+    
     # only update fragility map if auto_calc is checked
     if (shiny::isTruthy(input$auto_calc) & !is.null(local_data$requested_electrodes) & shiny::isTruthy(local_data$elec_present)) {
       # update fragility map if there are conditions requested
@@ -306,7 +312,7 @@ observeEvent(
         local_data$brain_f <- f_outputs$brain_f
         local_data$f_plot_params <- f_outputs$f_plot_params
         local_data$f_table_params <- f_outputs$f_table_params
-        local_data$selected$f <- f_outputs$sel
+        local_data$selected$f <- module_tools$get_meta('trials')$Condition[f_outputs$sel]
         
         local_data$J <- length(f_outputs$f_plot_params$x)
         local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset, tp = preload_info$time_points))
@@ -358,7 +364,7 @@ observeEvent(
     local_data$brain_f <- f_outputs$brain_f
     local_data$f_plot_params <- f_outputs$f_plot_params
     local_data$f_table_params <- f_outputs$f_table_params
-    local_data$selected$f <- f_outputs$sel
+    local_data$selected$f <- module_tools$get_meta('trials')$Condition[f_outputs$sel]
     
     local_data$J <- length(f_outputs$f_plot_params$x)
     local_data$f_plot_params <- append(local_data$f_plot_params, list(sz_onset = input$sz_onset, tp = preload_info$time_points))
@@ -391,7 +397,8 @@ observeEvent(
     # sync voltage electrodes with requested fragility electrodes if v_sync is on
     if (input$v_sync){
       updateTextInput(session = session, inputId = 'v_electrode', value = input$text_electrode)
-      local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
+      # local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
+      local_data$voltage_electrodes <- local_data$f_plot_params$elec_order
     } else {
       local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
     }
@@ -424,9 +431,9 @@ observeEvent(
   list(
     input$v_conditions,
     input$v_electrode,
-    input$v_sync
+    input$v_sync,
+    local_data$v_reload
   ), {
-    
     # if voltage traces have been loaded
     if (exists('trial') & shiny::isTruthy(local_data$v_loaded)) {
       t <- trial$Trial[trial$Condition %in% input$v_conditions]
@@ -434,7 +441,7 @@ observeEvent(
       # sync voltage electrodes with requested fragility electrodes if v_sync is on
       if (input$v_sync){
         updateTextInput(session = session, inputId = 'v_electrode', value = input$text_electrode)
-        local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
+        local_data$voltage_electrodes <- local_data$f_plot_params$elec_order
       } else {
         local_data$voltage_electrodes <- dipsaus::parse_svec(input$v_electrode)
       }

@@ -62,7 +62,7 @@ if (any(local_data$check$adj) & (is.null(isolate(local_data$adj_info)) | new_sub
   # automatically load first trial as default
   tnum_adj <- which(local_data$check$adj)[1]
   local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
-  local_data$selected$adj <- local_data$adj_info$trial
+  local_data$selected$adj <- module_tools$get_meta('trials')$Condition[local_data$adj_info$trial]
   removeNotification('adj_loading')
   new_subject <- FALSE
 } else {
@@ -76,8 +76,8 @@ local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
 # update available trials every recalculate
 possible <- list(
   pt = local_data$check$pt,
-  adj = trial$Trial[local_data$check$adj],
-  f = trial$Trial[local_data$check$f]
+  adj = module_tools$get_meta('trials')$Condition[trial$Trial[local_data$check$adj]],
+  f = module_tools$get_meta('trials')$Condition[trial$Trial[local_data$check$f]]
 )
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------

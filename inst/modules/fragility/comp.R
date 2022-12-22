@@ -223,7 +223,7 @@ define_input(
 )
 
 define_input(
-  selectInput(inputId = 'sort_fmap', choices = c('Electrode (descending)', 'Electrode (ascending)','Fragility'), selected = 'Electrode (descending)', label='Sort Fragility Map By:')
+  selectInput(inputId = 'sort_fmap', choices = c('Electrode (descending)', 'Electrode (ascending)','Fragility (descending)', 'Fragility (ascending)'), selected = 'Electrode (descending)', label='Sort Fragility Map By:')
 )
 
 define_input(
@@ -309,7 +309,7 @@ define_input(
 )
 
 define_input(
-  checkboxInput(inputId = 'v_sync', label = 'Sync electrodes with Fragility Map?')
+  checkboxInput(inputId = 'v_sync', label = 'Sync electrodes with Fragility Map?', value = TRUE)
 )
 
 define_input(
