@@ -109,7 +109,7 @@ generate_adj_array <- function(t_window, t_step, v, trial_num, nlambda, ncores) 
   A <- array(dim = c(N,N,J))
   mse <- vector(mode = "numeric", length = J)
   
-  adjprogress = rave::progress(title = 'Generating Adjacency Array', max = J)
+  adjprogress = rave::progress(title = 'Generating Adjacency Array (Step 1 of 2)', max = J)
   shiny::showNotification('Calculating estimated time remaining...', id = 'first_est', duration = NULL)
   
   # run multiple timewindows in parallel depending on number of cores selected
@@ -223,7 +223,7 @@ generate_fragility_matrix <- function(A, elec, lim = 1i, ncores) {
   N <- dim(A)[1]
   J <- dim(A)[3]
   f_vals <- matrix(nrow = N, ncol = J)
-  fprogress = rave::progress(title = 'Generating Fragility Matrix', max = J)
+  fprogress = rave::progress(title = 'Generating Fragility Matrix (Step 2 of 2)', max = J)
   shiny::showNotification('Calculating estimated time remaining...', id = 'first_est', duration = NULL)
   
   for (k in 1:J) {

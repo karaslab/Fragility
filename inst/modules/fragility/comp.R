@@ -121,7 +121,11 @@ define_input(
 )
 
 define_input(
-  actionButton(inputId = 'process_pt', label='Pre-process Patient')
+  actionButton(inputId = 'process_pt', label='Process Patient')
+)
+
+define_input(
+  actionButton(inputId = 'preprocess_pt', label='Pre-Process Patient Separately')
 )
 
 # Step 2: Generate Model----
@@ -161,7 +165,7 @@ define_input(
 )
 
 define_input(
-  selectInput(inputId = 'adj_conditions', choices = character(0), label='Seizure Trial for Matrix Generation'),
+  selectInput(inputId = 'adj_conditions', choices = character(0), label='Select Trial'),
   
   init_args = c('choices', 'selected'),
   
@@ -172,11 +176,11 @@ define_input(
 )
 
 define_input(
-  actionButton(inputId = 'gen_adj', label='Generate Adjacency Matrix for this Trial')
+  actionButton(inputId = 'gen_adj', label='Generate Adjacency Matrix Separately')
 )
 
 define_input(
-  actionButton(inputId = 'gen_f', label='Generate Fragility Matrix for this Trial')
+  actionButton(inputId = 'gen_f', label='Generate Fragility Matrix Separately')
 )
 
 # Step 3: View Fragility----
@@ -337,21 +341,22 @@ define_input(
 
 # the input_layout list is used by rave to determine order and grouping of layouts
 input_layout <- list(
-  '[-]Step 1: Process Patient' = list(
+  'Step 1: Process Patient' = list(
+    'adj_conditions',
     'recording_unit',
     'half_hz',
+    'requested_ncores',
     'process_pt'
   ),
-  '[-]Step 2: Generate Model' = list(
+  '[-]Advanced Options' = list(
     'requested_twindow',
     'requested_tstep',
     'requested_nlambda',
-    'requested_ncores',
-    'adj_conditions',
+    'preprocess_pt',
     'gen_adj',
     'gen_f'
   ),
-  '[-]Step 3: View Fragility' = list(
+  'Step 2: View Fragility' = list(
     'requested_conditions',
     'text_electrode',
     'sort_fmap',
@@ -368,13 +373,13 @@ input_layout <- list(
     'v_sync',
     'load_v_traces'
   ),
-  '[-]Re-check Files' = list(
-    'refresh_btn'
-  ),
   '[-]Experimental' = list(
     'experimental',
     'limreal',
     'limimag'
+  ),
+  '[-]Re-check Files' = list(
+    'refresh_btn'
   )
 )
 
@@ -455,19 +460,6 @@ define_output_3d_viewer(
   height = '500px',
   order = 6
 )
-
-# output_layout <- list(
-#   'Status' = list(
-#     'current_sel',
-#     'possible_sel'
-#   ),
-#   'Visualization' = list(
-#     'voltage_trace',
-#     'fragility_map',
-#     'fragility_table',
-#     'power_3d'
-#   )
-# )
 
 # <<<<<<<<<<<< End ----------------- [DO NOT EDIT THIS LINE] -------------------
 

@@ -17,6 +17,15 @@ rave::rave_prepare(
   reference = 'car'
 )
 
+rave::rave_prepare(
+  subject = 'HUPDataset/HUP116',
+  electrodes =  c(3:52),
+  epoch = 'subHUP116_seizure',
+  time_range = c(20,20),
+  data_types = 'voltage',
+  reference = 'car'
+)
+
 # initiates module in R environment
 init_module('fragility', debug = TRUE)
 

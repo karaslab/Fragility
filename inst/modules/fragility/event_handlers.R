@@ -32,10 +32,134 @@ local_data = reactiveValues(
   )
 )
 
-# when pre-process patient button is clicked
+# STEP 1: PROCESS PATIENT --------------
+
+# when process patient button is clicked:
+# preprocess pt, then generate adjacency array, then generate fragility matrix
 observeEvent(
   input$process_pt, {
     print('process_pt button clicked')
+    showNotification('Pre-processing patient...', id = 'pt_processing', duration = NULL)
+    
+    if (!local_data$check$pt) {
+      # generate processed pt_info
+      local_data$pt_info <- process_fragility_patient(
+        v = local_data$v,
+        unit = input$recording_unit,
+        srate = srate,
+        halve = input$half_hz
+      )
+      
+      # save into module_data folder
+      saveRDS(local_data$pt_info, file = paste0(module_data,'/',subject_code,'_pt_info'))
+      removeNotification(id = 'pt_processing')
+    }
+    
+    # generate adjacency matrix
+    
+    # convert requested_tstep and twindow from ms to # of datapoints within that timewindow using Hz
+    local_data$twindow <- 2 * round(input$requested_twindow * local_data$pt_info$srate / 2000) # twindow needs to be even number
+    if (as.numeric(input$requested_tstep) == input$requested_twindow) {
+      local_data$tstep <- local_data$twindow
+    } else if (as.numeric(requested_tstep)*2 == requested_twindow) {
+      local_data$tstep <- local_data$twindow/2
+    } else {
+      stop('Time step should always be equal to or half of time window')
+    }
+    
+    S <- dim(local_data$pt_info$v)[2] # S is total number of timepoints
+    
+    if(S %% local_data$tstep != 0) {
+      # truncate S to greatest number evenly divisible by timestep
+      S <- trunc(S/local_data$tstep) * local_data$tstep
+    }
+    J <- S/local_data$tstep - (local_data$twindow/local_data$tstep) + 1
+    
+    # pop-up screen with additional info for adj array processing
+    showModal(modalDialog(
+      title = 'Confirmation',
+      easyClose = F,
+      footer = tagList(
+        actionButton(inputId = ns('cancel'), 'Cancel'),
+        actionButton(inputId = ns('ok'), 'Do it!')
+      ),
+      fluidRow(column(
+        width = 12,
+        p('Generate adjacency array for: '),
+        tags$blockquote(paste0(J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
+        p('This might take a while. Estimated time remaining will appear after first time window is calculated.')
+      ))
+    ))
+  }
+)
+
+# when "Do it!" button on pop-up screen is clicked
+# (start adj array and then fragility matrix processing)
+observeEvent(
+  input$ok, {
+    # generate adj_info
+    local_data$adj_info <- generate_adj_array(
+      t_window = local_data$twindow,
+      t_step = local_data$tstep,
+      v = local_data$pt_info$v,
+      trial_num = tnum_adj,
+      nlambda = input$requested_nlambda,
+      ncores = input$requested_ncores
+    )
+    
+    # add trial metadata and save adj_info with trial number into module_data
+    local_data$adj_info <- append(local_data$adj_info, list(trial = tnum_adj))
+    saveRDS(local_data$adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    showNotification('Adjacency array generation finished!')
+    
+    # generate fragility matrix
+    
+    # set custom eigenvalue limits if experimental features are turned on
+    # eigenvalues with absolute values >=1 create unstable systems
+    if (experimental) {
+      lim <- complex(real = input$limreal, imaginary = input$limimag)
+      local_data$f_info <- generate_fragility_matrix(
+        A = local_data$adj_info$A,
+        elec = attr(local_data$pt_info$v, "dimnames")$Electrode,
+        lim = lim,
+        ncores = input$requested_ncores
+      )
+    } else {
+      # otherwise, default to eigenvalue limit of 1i
+      local_data$f_info <- generate_fragility_matrix(
+        A = local_data$adj_info$A,
+        elec = attr(local_data$pt_info$v, "dimnames")$Electrode,
+        ncores = input$requested_ncores
+      )
+    }
+    
+    # save fragility matrix into module_data
+    local_data$f_info <- append(local_data$f_info, list(trial = tnum_adj))
+    saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
+    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    
+    # update condition selector to reflect new trial
+    updateSelectInput(session = session, inputId = 'requested_conditions',
+                      choices = module_tools$get_meta('trials')$Condition[local_data$check$f],
+                      selected = input$requested_conditions)
+    
+    # update check to reflect newly generated file
+    local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
+    removeModal()
+  }
+)
+
+# when cancel button on pop-up screen is clicked
+observeEvent(input$cancel, {
+  removeModal()
+})
+
+# ADVANCED OPTIONS --------------
+
+# when process patient separately button is clicked
+observeEvent(
+  input$preprocess_pt, {
+    print('preprocess_pt button clicked')
     showNotification('Pre-processing patient...', id = 'pt_processing', duration = NULL)
     
     # generate processed pt_info
@@ -49,11 +173,11 @@ observeEvent(
     # save into module_data folder
     saveRDS(local_data$pt_info, file = paste0(module_data,'/',subject_code,'_pt_info'))
     removeNotification(id = 'pt_processing')
-    showNotification('Pre-processing complete!')
+    showNotification('Pre=processing complete!')
   }
 )
 
-# when generate adjacency array button is clicked
+# when generate adjacency array separately button is clicked
 observeEvent(
   input$gen_adj, {
     
@@ -85,7 +209,7 @@ observeEvent(
         easyClose = F,
         footer = tagList(
           actionButton(inputId = ns('cancel'), 'Cancel'),
-          actionButton(inputId = ns('ok'), 'Do it!')
+          actionButton(inputId = ns('ok_sep'), 'Do it!')
         ),
         fluidRow(column(
           width = 12,
@@ -100,14 +224,9 @@ observeEvent(
   }
 )
 
-# when cancel button on pop-up screen is clicked
-observeEvent(input$cancel, {
-  removeModal()
-})
-
-# when "Do it!" button on pop-up screen is clicked (start adj array processing)
+# when "Do it!" button for separate adj array processing is clicked
 observeEvent(
-  input$ok, {
+  input$ok_sep, {
     # generate adj_info
     local_data$adj_info <- generate_adj_array(
       t_window = local_data$twindow,
@@ -129,7 +248,7 @@ observeEvent(
   }
 )
 
-# when generate fragility matrix button is clicked
+# when generate fragility matrix separately button is clicked
 observeEvent(
   input$gen_f, {
     
@@ -177,6 +296,8 @@ observeEvent(
     }
   }
 )
+
+# STEP 2: VIEW FRAGILITY --------------
 
 # when condition selector under adjacency matrix generation is changed
 observeEvent(
@@ -387,6 +508,8 @@ observeEvent(
   }
 )
 
+### VIEW ORIGINAL RAW EEG DATA --------------
+
 # when Load EEG Voltage Traces button is clicked
 observeEvent(
   input$load_v_traces, {
@@ -467,6 +590,8 @@ observeEvent(
   }
 )
 
+### RE-CHECK FILES --------------
+
 # when refresh button is clicked
 observeEvent(
   input$refresh_btn, {
@@ -492,6 +617,8 @@ observeEvent(
     removeNotification('refreshing')
   }
 )
+
+### 3D BRAIN VIEWER FUNCTIONS --------------
 
 # adapted function for 3D brain viewer, imported from ravebuiltins package
 power_3d_fun <- function(need_calc, side_width, daemon_env, viewer_proxy, ...){
