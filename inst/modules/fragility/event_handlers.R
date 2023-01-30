@@ -11,6 +11,7 @@ static_data = dipsaus::fastmap2()
 local_data = reactiveValues(
   v = NULL,
   check = NULL,
+  tnum_adj = NULL,
   pt_info = NULL,
   adj_info = NULL,
   f_info = NULL,
@@ -34,14 +35,36 @@ local_data = reactiveValues(
 
 # STEP 1: PROCESS PATIENT --------------
 
+# when condition selector under adjacency matrix generation is changed
+observeEvent(
+  input$adj_conditions, {
+    print('input$adj_conditions')
+    if (exists('trial')) {
+      local_data$tnum_adj <- trial$Trial[trial$Condition %in% input$adj_conditions]
+      if (shiny::isTruthy(local_data$adj_info) & shiny::isTruthy(local_data$check$adj[local_data$tnum_adj])) {
+        if (local_data$adj_info$trial != local_data$tnum_adj) {
+          # if the user requests adj_info for a different trial than the one currently loaded
+          local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',local_data$tnum_adj))
+        }
+        # save currently selected trial for "Currently Loaded Trials" display
+        local_data$selected$adj <- module_tools$get_meta('trials')$Condition[local_data$adj_info$trial]
+      }
+      updateActionButton(session = session, inputId = 'gen_adj', 
+                         label = paste0('Generate Adjacency Array for ', input$adj_conditions))
+      updateActionButton(session = session, inputId = 'gen_f', 
+                         label = paste0('Generate Fragility Matrix for ', input$adj_conditions))
+    }
+  }
+)
+
 # when process patient button is clicked:
 # preprocess pt, then generate adjacency array, then generate fragility matrix
 observeEvent(
   input$process_pt, {
-    print('process_pt button clicked')
-    showNotification('Pre-processing patient...', id = 'pt_processing', duration = NULL)
+    print('input$process_pt')
     
     if (!local_data$check$pt) {
+      showNotification('Pre-processing patient...', id = 'pt_processing', duration = NULL)
       # generate processed pt_info
       local_data$pt_info <- process_fragility_patient(
         v = local_data$v,
@@ -74,6 +97,8 @@ observeEvent(
       S <- trunc(S/local_data$tstep) * local_data$tstep
     }
     J <- S/local_data$tstep - (local_data$twindow/local_data$tstep) + 1
+
+    #print(local_data$tnum_adj)
     
     # pop-up screen with additional info for adj array processing
     showModal(modalDialog(
@@ -86,6 +111,7 @@ observeEvent(
       fluidRow(column(
         width = 12,
         p('Generate adjacency array for: '),
+        tags$blockquote(paste0('Trial: ', trial$Condition[local_data$tnum_adj])),
         tags$blockquote(paste0(J, ' time windows, ', length(preload_info$electrodes), ' electrodes (', dipsaus::deparse_svec(preload_info$electrodes), ')')),
         p('This might take a while. Estimated time remaining will appear after first time window is calculated.')
       ))
@@ -97,19 +123,21 @@ observeEvent(
 # (start adj array and then fragility matrix processing)
 observeEvent(
   input$ok, {
+    print('input$ok')
+    #print(local_data$tnum_adj)
     # generate adj_info
     local_data$adj_info <- generate_adj_array(
       t_window = local_data$twindow,
       t_step = local_data$tstep,
       v = local_data$pt_info$v,
-      trial_num = tnum_adj,
+      trial_num = local_data$tnum_adj,
       nlambda = input$requested_nlambda,
       ncores = input$requested_ncores
     )
     
     # add trial metadata and save adj_info with trial number into module_data
-    local_data$adj_info <- append(local_data$adj_info, list(trial = tnum_adj))
-    saveRDS(local_data$adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    local_data$adj_info <- append(local_data$adj_info, list(trial = local_data$tnum_adj))
+    saveRDS(local_data$adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',local_data$tnum_adj))
     showNotification('Adjacency array generation finished!')
     
     # generate fragility matrix
@@ -134,8 +162,8 @@ observeEvent(
     }
     
     # save fragility matrix into module_data
-    local_data$f_info <- append(local_data$f_info, list(trial = tnum_adj))
-    saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
+    local_data$f_info <- append(local_data$f_info, list(trial = local_data$tnum_adj))
+    saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',local_data$tnum_adj))
     local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     
     # update condition selector to reflect new trial
@@ -151,6 +179,7 @@ observeEvent(
 
 # when cancel button on pop-up screen is clicked
 observeEvent(input$cancel, {
+  print('input$cancel')
   removeModal()
 })
 
@@ -159,7 +188,7 @@ observeEvent(input$cancel, {
 # when process patient separately button is clicked
 observeEvent(
   input$preprocess_pt, {
-    print('preprocess_pt button clicked')
+    print('input$preprocess_pt')
     showNotification('Pre-processing patient...', id = 'pt_processing', duration = NULL)
     
     # generate processed pt_info
@@ -180,7 +209,7 @@ observeEvent(
 # when generate adjacency array separately button is clicked
 observeEvent(
   input$gen_adj, {
-    
+    print('input$gen_adj')
     # re-check what files are available
     # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     
@@ -227,19 +256,20 @@ observeEvent(
 # when "Do it!" button for separate adj array processing is clicked
 observeEvent(
   input$ok_sep, {
+    print('input$ok_sep')
     # generate adj_info
     local_data$adj_info <- generate_adj_array(
       t_window = local_data$twindow,
       t_step = local_data$tstep,
       v = local_data$pt_info$v,
-      trial_num = tnum_adj,
+      trial_num = local_data$tnum_adj,
       nlambda = input$requested_nlambda,
       ncores = input$requested_ncores
     )
     
     # add trial metadata and save adj_info with trial number into module_data
-    local_data$adj_info <- append(local_data$adj_info, list(trial = tnum_adj))
-    saveRDS(local_data$adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    local_data$adj_info <- append(local_data$adj_info, list(trial = local_data$tnum_adj))
+    saveRDS(local_data$adj_info, file = paste0(module_data,'/',subject_code,'_adj_info_trial_',local_data$tnum_adj))
     showNotification('Adjacency array generation finished!')
     
     # update check to reflect newly generated file
@@ -251,13 +281,13 @@ observeEvent(
 # when generate fragility matrix separately button is clicked
 observeEvent(
   input$gen_f, {
-    
+    print('input$gen_f')
     # re-check what files are available
     # local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
     
     # show different messages based on what files are available
     if (local_data$check$pt) {
-      if (local_data$check$adj[tnum_adj]) {
+      if (local_data$check$adj[local_data$tnum_adj]) {
         print('gen_f button clicked')
         
         # set custom eigenvalue limits if experimental features are turned on
@@ -280,8 +310,8 @@ observeEvent(
         }
         
         # save fragility matrix into module_data
-        local_data$f_info <- append(local_data$f_info, list(trial = tnum_adj))
-        saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',tnum_adj))
+        local_data$f_info <- append(local_data$f_info, list(trial = local_data$tnum_adj))
+        saveRDS(local_data$f_info, file = paste0(module_data,'/',subject_code,'_f_info_trial_',local_data$tnum_adj))
         local_data$check <- check_subject(subject_code,subject_dir,trial$Trial)
         
         # update condition selector to reflect new trial
@@ -299,30 +329,10 @@ observeEvent(
 
 # STEP 2: VIEW FRAGILITY --------------
 
-# when condition selector under adjacency matrix generation is changed
-observeEvent(
-  input$adj_conditions, {
-    if (exists('trial')) {
-      t <- trial$Trial[trial$Condition %in% input$adj_conditions]
-      if (shiny::isTruthy(local_data$adj_info) & shiny::isTruthy(local_data$check$adj[t])) {
-        if (local_data$adj_info$trial != t) {
-          # if the user requests adj_info for a different trial than the one currently loaded
-          local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',t))
-        }
-        # save currently selected trial for "Currently Loaded Trials" display
-        local_data$selected$adj <- module_tools$get_meta('trials')$Condition[local_data$adj_info$trial]
-      }
-      updateActionButton(session = session, inputId = 'gen_adj', 
-                         label = paste0('Generate Adjacency Array for ', input$adj_conditions))
-      updateActionButton(session = session, inputId = 'gen_f', 
-                         label = paste0('Generate Fragility Matrix for ', input$adj_conditions))
-    }
-  }
-)
-
 # when electrode selector textbox is changed
 observeEvent(
   input$text_electrode, {
+    print('input$text_electrode')
     # assign requested electrodes from text_electrode input
     local_data$requested_electrodes <- dipsaus::parse_svec(input$text_electrode)
     
@@ -396,6 +406,7 @@ observeEvent(
     input$sz_onset,
     input$exponentiate
   ), {
+    print('input$fragility_map_inputs')
     # sync v_conditions with requested_conditions
     updateSelectInput(session = session, inputId = 'v_conditions',
                       selected = input$requested_conditions)
@@ -455,6 +466,7 @@ observeEvent(
 # when Calculate Fragility! button is clicked
 observeEvent(
   input$draw_f_map, {
+    print('input$draw_f_map')
     # assign requested electrodes from text_electrode input
     local_data$requested_electrodes <- dipsaus::parse_svec(input$text_electrode)
     
@@ -500,6 +512,7 @@ observeEvent(
 # when exponentiate bar is changed
 observeEvent(
   input$exponentiate, {
+    print('input$exponentiate')
     # if brain_f exists, update it with exponentiated version and rebuild 3d viewer
     if (shiny::isTruthy(local_data$brain_f)) {
       local_data$brain_f_plot <- dplyr::mutate(local_data$brain_f, Avg_Fragility = Avg_Fragility^input$exponentiate)
@@ -513,7 +526,7 @@ observeEvent(
 # when Load EEG Voltage Traces button is clicked
 observeEvent(
   input$load_v_traces, {
-    
+    print('input$load_v_traces')
     # get requested trial number and electrodes
     t <- trial$Trial[trial$Condition %in% input$v_conditions]
     
@@ -557,6 +570,7 @@ observeEvent(
     input$v_sync,
     local_data$v_reload
   ), {
+    print('input$voltace_trace_inputs')
     # if voltage traces have been loaded
     if (exists('trial') & shiny::isTruthy(local_data$v_loaded)) {
       t <- trial$Trial[trial$Condition %in% input$v_conditions]
@@ -590,11 +604,27 @@ observeEvent(
   }
 )
 
-### RE-CHECK FILES --------------
+### FILES --------------
+
+# update electrodes.csv with channel names
+observeEvent(
+  input$elec_names, {
+    print('input$elec_names')
+    channels <- read.delim(input$channel_file$datapath)
+    if ('name' %in% colnames(channels)){
+      electrodes <- read.csv(paste0(subject_dir$meta_dir,'/electrodes.csv'))
+      electrodes$Label <- channels$name[module_tools$get_valid_electrodes()]
+      write.csv(electrodes, paste0(subject_dir$meta_dir,'/electrodes.csv'))
+    } else {
+      showNotification('Uploaded file is not in the proper format!')
+    }
+  }
+)
 
 # when refresh button is clicked
 observeEvent(
   input$refresh_btn, {
+    print('input$refresh_btn')
     showNotification('Re-reading patient info...', id = 'refreshing', duration = NULL)
     
     # re-check what files are available
@@ -606,8 +636,8 @@ observeEvent(
     }
     
     # reload adj_info file with requested adj condition if available
-    if (local_data$check$adj[tnum_adj]) {
-      local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+    if (local_data$check$adj[local_data$tnum_adj]) {
+      local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',local_data$tnum_adj))
     }
     
     # update available conditions in view fragility section

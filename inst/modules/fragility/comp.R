@@ -171,7 +171,7 @@ define_input(
   
   init_expr = {
     choices = unique(module_tools$get_meta('trials')$Condition)
-    selected = module_tools$get_meta('trials')$Condition[1]
+    selected = module_tools$get_meta('trials')$Condition[local_data$tnum_adj]
   }
 )
 
@@ -323,6 +323,14 @@ define_input(
 # Re-check Files----
 
 define_input(
+  fileInput(inputId = 'channel_file', 'Upload .tsv of channels (from BIDS format)', accept = '.tsv', placeholder = 'Filename should end in channels.tsv')
+)
+
+define_input(
+  actionButton(inputId = 'elec_names', label='Update electrode names')
+)
+
+define_input(
   actionButton(inputId = 'refresh_btn', label='Refresh')
 )
 
@@ -379,6 +387,8 @@ input_layout <- list(
     'limimag'
   ),
   '[-]Re-check Files' = list(
+    'channel_file',
+    'elec_names',
     'refresh_btn'
   )
 )

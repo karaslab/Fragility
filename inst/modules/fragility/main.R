@@ -69,14 +69,14 @@ if (any(local_data$check$adj) & (is.null(isolate(local_data$adj_info)) | new_sub
   showNotification('Loading existing adjacency array...', id = 'adj_loading')
   
   # automatically load first trial as default
-  tnum_adj <- which(local_data$check$adj)[1]
-  local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',tnum_adj))
+  local_data$tnum_adj <- which(local_data$check$adj)[1]
+  local_data$adj_info <- readRDS(paste0(module_data,'/',subject_code,'_adj_info_trial_',local_data$tnum_adj))
   local_data$selected$adj <- module_tools$get_meta('trials')$Condition[local_data$adj_info$trial]
   removeNotification('adj_loading')
   new_subject <- FALSE
 } else {
-  # if already initialized, update tnum_adj to reflect user selection
-  tnum_adj <- trial$Trial[trial$Condition %in% adj_conditions]
+  # if already initialized, update local_data$tnum_adj to reflect user selection
+  # local_data$tnum_adj <- trial$Trial[trial$Condition %in% input$adj_conditions]
 }
 
 # check which files are available every recalculate
